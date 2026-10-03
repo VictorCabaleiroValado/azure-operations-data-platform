@@ -7,17 +7,17 @@
 - JavaScript static calculations agree with the SQL API across all 32 region/network/period/test-threshold combinations.
 - Ruff passes for source, tests and scripts.
 - Bicep v0.47.16 compiles both main infrastructure and budget templates without diagnostics. The main template also supports an optional private Azure Container Registry with identity-based image pulls. Compilation does not validate runtime permissions.
-- All four GitHub workflow YAML files parse locally. Hosted workflow execution has not occurred.
+- Five workflow files are present. Hosted CI runs 37160004327 and 37160153783 succeeded, including tests, frontend/API parity, Docker build/liveness and Bicep compilation.
 - Browser review: local UI loads real metrics; connection and minimum-test filters update the view; a no-data selection displays missing values and zero evidence. At 390px viewport, document/body widths were both 390px (no page-level horizontal overflow). Desktop and mobile layouts were visually inspected.
 - Local API benchmark: see `evidence/local-api-benchmark.json`. It is an in-process TestClient measurement, not a load test or network latency measurement.
 - Static snapshot is generated from the same SQL records, with visible snapshot identification and source attribution.
 
 ## Remaining checks
 
-- Docker build and container runtime: Docker is unavailable on the authoring machine. CI includes the build and liveness test, but it has not run remotely.
-- Azure deployment, OIDC, actual RBAC denial, cloud lease concurrency, application telemetry and cost measurement require an approved subscription and spending decision.
+- Docker build and container liveness passed in hosted CI. A live Azure container execution is still pending.
+- Azure deployment, OIDC, actual RBAC denial, cloud lease concurrency, application telemetry and cost measurement remain pending live verification; the student subscription and scoped build identity are already approved.
 - Browser CSV download completion could not be captured by the in-app browser's download event. CSV generation/filter scope has source-level coverage; recheck an actual downloaded file in Edge before publication.
-- Public GitHub repository, image package, portfolio URL and LinkedIn publication have not been created or changed.
+- Public GitHub repository and GitHub Pages demo are published (Pages run 37160030429 succeeded). The private Azure image workflow 37160211867 failed at azure/login before building. Azure application deployment, portfolio-profile updates and LinkedIn publication remain incomplete.
 
 ## Account check
 

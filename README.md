@@ -1,20 +1,29 @@
 # Azure Telecom Cloud
 
-A reproducible cloud data platform for exploring observed connectivity in Madrid and Fayetteville. Built by Victor Manuel Cabaleiro Valado to connect telecommunications engineering, statistical analysis and Azure operations.
+An internet-speed explorer for Madrid and Fayetteville, built by Victor Manuel Cabaleiro Valado. I chose these areas because my background connects telecommunications engineering in Madrid with graduate study in Arkansas.
 
-**Current status:** real-source ingestion and local application verified. Azure infrastructure is implemented in Bicep and compiled locally. Cloud deployment, container execution, GitHub Actions runs and cloud costs are not yet verified. See [verification](docs/VERIFICATION.md).
+The question is simple: **what download speed, upload speed and latency were recorded in each study area, and how did they differ between two quarters?** The data comes from public Ookla measurements, not a network I operate.
 
-## What it does
+[Open the free demo](https://victorcabaleirovalado.github.io/azure-telecom-cloud/) · [Understand the project in Spanish](docs/LEARNING.md)
 
-- Reads public Ookla Parquet data for fixed/mobile connections, Q3–Q4 2024.
-- Validates 7,403 tile-period observations across eight study-area partitions.
-- Publishes immutable SQLite analytical snapshots, with atomic release switching.
-- Serves parameterized SQL queries through a read-only FastAPI application.
-- Provides an interactive geographic plot, sample-size filters, matched-tile comparisons and CSV export.
-- Defines Azure Container Apps, a processing Job, Blob Storage, separate managed identities, scoped RBAC, Log Analytics and Application Insights in Bicep.
-- Includes CI, image-build and OIDC deployment workflows, plus a static portfolio edition.
+## Three steps
 
-The shipped study window is historical and deliberately bounded. It is not a live network-monitoring system. The configured quarters do not advance automatically.
+1. **Process:** a Python program downloads and checks the selected data. In Azure it is designed to run as a Container Apps Job.
+2. **Store:** Azure Blob Storage holds the resulting data file. SQL queries run against SQLite; there is no separate database server.
+3. **Show:** one Container App serves both the Python API and the website. Visitors select a place, connection type and quarter, inspect the map, and export the results.
+
+```mermaid
+flowchart LR
+    O[Public Ookla data] --> J[Azure Container Apps Job: process]
+    J --> B[Azure Blob Storage: save]
+    B --> A[Azure Container App: API and website]
+```
+
+Azure Monitor supplies logs. Managed identities give each component the permissions it needs without storing account passwords. Bicep describes the resources so the setup can be repeated. These support the three steps above.
+
+**Verified:** public GitHub repository and GitHub Pages demo; ingestion of 7,403 observations; local tests; hosted CI including a Docker build and liveness check. **In progress:** the Azure application deployment. Azure for Students is active, but the first private image workflow failed at Azure login. The public demo currently uses a static snapshot, not a running Azure API. See [verification](docs/VERIFICATION.md).
+
+The dataset covers fixed/mobile connections in Q3–Q4 2024. It is historical, not live network monitoring.
 
 ## Try it locally
 
@@ -60,35 +69,19 @@ docker run --rm -p 8765:8000 \
   -v "$PWD/data/processed:/data:ro" azure-telecom-cloud:local
 ```
 
-The container runs as a non-root user. No account keys or `.env` files are included. Docker was not available on the authoring machine; image execution remains a separate check.
+The container runs as a non-root user. No account keys or `.env` files are included. Docker build and container liveness were verified in GitHub Actions; Docker is not installed on the authoring machine.
 
-## Azure architecture
+## Technical details
 
-```mermaid
-flowchart LR
-    O[Ookla public Parquet] --> J[Container Apps Job: Python + DuckDB]
-    J --> Q[Schema and quality gates]
-    Q --> B[Blob Storage: immutable SQL snapshots]
-    B --> A[Container Apps: read-only FastAPI]
-    A --> W[Interactive web application]
-    G[GitHub Actions + OIDC] --> I[Bicep infrastructure]
-    I -. deploys .-> J
-    I -. deploys .-> A
-    J --> M[Azure Monitor / Log Analytics]
-    A --> T[Application Insights]
-```
+Start with the [Spanish walkthrough](docs/LEARNING.md). Then read [architecture decisions](docs/ARCHITECTURE.md), [deployment and recovery](docs/RUNBOOK.md) and [data methodology](docs/METHODOLOGY.md).
 
-Read [architecture decisions](docs/ARCHITECTURE.md), [deployment and recovery](docs/RUNBOOK.md), [data methodology](docs/METHODOLOGY.md) and [learning guide](docs/LEARNING.md).
-
-## Why these choices?
-
-Azure is the operating environment; telecom is the domain. An immutable file-backed SQL snapshot is sufficient for this bounded, read-heavy application. It avoids the fixed cost and operational burden of a continuously running database server. Azure SQL, private networking and event-driven orchestration are documented extensions, not claims about the current implementation.
+The current dataset fits in a small SQL file. Using Blob Storage avoids running a database server for a read-only demo. The API and website share one app, and the processing job only runs when requested. We keep this scope until there is a concrete reason to expand it.
 
 ## Portfolio edition
 
 `dist/` is a self-contained static website. Serve it with `python -m http.server 8766 --directory dist`. It visibly identifies itself as a static data snapshot. The static edition uses the same data and calculations and does not silently mask a failed live API.
 
-Professional descriptions and a demo script are provided in [PROFILE-DRAFTS.md](docs/PROFILE-DRAFTS.md). Publication and profile edits have not been performed.
+Professional descriptions and a demo script are provided in [PROFILE-DRAFTS.md](docs/PROFILE-DRAFTS.md). The repository and static demo are public. LinkedIn and portfolio-profile edits have not been published.
 
 ## Data attribution and license
 
