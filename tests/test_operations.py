@@ -184,3 +184,46 @@ def test_paths_and_integer_money(store):
     for r in inventory(store):
         assert type(r["value_cents"]) is int
     assert json.loads(store.get(f"results/{run['id']}.json"))["rows"]
+
+
+def test_queue_batch_acknowledges_only_processed_messages(store, monkeypatch):
+    from types import SimpleNamespace
+
+    from operations_cloud.worker import consume
+
+    record = submit(store, VALID, "nexo", "centro")
+    acknowledged, dead = [], []
+    message = SimpleNamespace(content=record["id"], dequeue_count=1)
+    store.queue = SimpleNamespace(
+        receive_messages=lambda **kwargs: iter([message]), delete_message=acknowledged.append
+    )
+    store.dead = SimpleNamespace(send_message=dead.append)
+    assert consume(store) == 1
+    assert acknowledged == [message] and not dead
+    assert get_run(store, record["id"])["status"] == "completed"
+
+
+def test_queue_transient_failure_is_not_acknowledged(store, monkeypatch):
+    from types import SimpleNamespace
+
+    from operations_cloud.worker import consume
+
+    record = submit(store, VALID, "nexo", "centro")
+    acknowledged, dead = [], []
+    message = SimpleNamespace(content=record["id"], dequeue_count=1)
+    store.queue = SimpleNamespace(
+        receive_messages=lambda **kwargs: iter([message]), delete_message=acknowledged.append
+    )
+    store.dead = SimpleNamespace(send_message=dead.append)
+
+    def fail(*args):
+        raise RuntimeError("temporary network failure")
+
+    monkeypatch.setattr("operations_cloud.worker.process", fail)
+    with pytest.raises(RuntimeError):
+        consume(store)
+    assert not acknowledged and not dead
+    message.dequeue_count = 5
+    consume(store)
+    assert acknowledged == [message] and len(dead) == 1
+    assert get_run(store, record["id"])["status"] == "failed"

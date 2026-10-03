@@ -15,7 +15,7 @@ catalog = next(r for r in app.routes if r.path == "/api/catalog").endpoint()
 output = ROOT / "dist"
 output.mkdir(exist_ok=True)
 shutil.copy(ROOT / "web/index.html", output / "index.html")
-shutil.copytree(ROOT / "web", output / "assets", dirs_exist_ok=True)
+shutil.copytree(ROOT / "web", output / "assets", dirs_exist_ok=True, ignore=shutil.ignore_patterns('index.html'))
 shutil.copytree(ROOT / "samples", output / "samples", dirs_exist_ok=True)
 mode = {"mode": "snapshot"}
 config_path = ROOT / "evidence/cloud-public.json"
