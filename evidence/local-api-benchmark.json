@@ -1,0 +1,7 @@
+{
+  "environment": "local in-process FastAPI TestClient; not network/cloud load test",
+  "requests": 50,
+  "median_ms": 16.46,
+  "p95_ms": 17.33,
+  "rows_per_response": 1192
+}

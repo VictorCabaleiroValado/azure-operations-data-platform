@@ -1,0 +1,11 @@
+{
+  "periods": ["2024-Q3", "2024-Q4"],
+  "networks": ["fixed", "mobile"],
+  "regions": [
+    {"id": "madrid", "name": "Madrid study area", "bbox": [-3.85, 40.30, -3.55, 40.58]},
+    {"id": "fayetteville", "name": "Fayetteville study area", "bbox": [-94.25, 35.98, -94.07, 36.15]}
+  ],
+  "minimum_tests": 10,
+  "review_download_mbps": 100,
+  "review_latency_ms": 40
+}

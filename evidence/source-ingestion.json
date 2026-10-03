@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "run_id": "aee0b1c4-f32e-46a3-bd3c-7e242e17b541",
+  "status": "succeeded",
+  "generated_at": "2026-10-03T22:07:24.847072+00:00",
+  "duration_seconds": 78.216,
+  "rows": 7403,
+  "partitions": 8,
+  "changed_partitions": 8,
+  "database": "aee0b1c4-f32e-46a3-bd3c-7e242e17b541/analytics.db",
+  "config": {
+    "periods": [
+      "2024-Q3",
+      "2024-Q4"
+    ],
+    "networks": [
+      "fixed",
+      "mobile"
+    ],
+    "regions": [
+      {
+        "id": "madrid",
+        "name": "Madrid study area",
+        "bbox": [
+          -3.85,
+          40.3,
+          -3.55,
+          40.58
+        ]
+      },
+      {
+        "id": "fayetteville",
+        "name": "Fayetteville study area",
+        "bbox": [
+          -94.25,
+          35.98,
+          -94.07,
+          36.15
+        ]
+      }
+    ],
+    "minimum_tests": 10,
+    "review_download_mbps": 100,
+    "review_latency_ms": 40
+  },
+  "sources": [
+    {
+      "region": "madrid",
+      "period": "2024-Q3",
+      "network": "fixed",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2024/quarter=3/2024-07-01_performance_fixed_tiles.parquet",
+      "rows": 1607,
+      "sha256": "9a6351a646ba715712207fce4ef7fbbb6dea75f1043a28c35615fab344aa04c4"
+    },
+    {
+      "region": "fayetteville",
+      "period": "2024-Q3",
+      "network": "fixed",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2024/quarter=3/2024-07-01_performance_fixed_tiles.parquet",
+      "rows": 579,
+      "sha256": "6370bae87bc073abeb7cea5d17cc756a9763c7c30658d7f048e0b6df555cf8ae"
+    },
+    {
+      "region": "madrid",
+      "period": "2024-Q3",
+      "network": "mobile",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=mobile/year=2024/quarter=3/2024-07-01_performance_mobile_tiles.parquet",
+      "rows": 1321,
+      "sha256": "6fe0f7f94fea54163f49e1e26df148b0304568021796e337f53e42897312db16"
+    },
+    {
+      "region": "fayetteville",
+      "period": "2024-Q3",
+      "network": "mobile",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=mobile/year=2024/quarter=3/2024-07-01_performance_mobile_tiles.parquet",
+      "rows": 154,
+      "sha256": "c8c52e2e02a8a7d023ed64ed3dc9eaa35e234d836cae2196bf0f79058d02054e"
+    },
+    {
+      "region": "madrid",
+      "period": "2024-Q4",
+      "network": "fixed",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2024/quarter=4/2024-10-01_performance_fixed_tiles.parquet",
+      "rows": 1627,
+      "sha256": "109a578798c4a854e843ce0c9f332db31b0d98b582e8fb739cc1d9ba7a48d364"
+    },
+    {
+      "region": "fayetteville",
+      "period": "2024-Q4",
+      "network": "fixed",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2024/quarter=4/2024-10-01_performance_fixed_tiles.parquet",
+      "rows": 589,
+      "sha256": "264d1bc3ae882a2325cf58b89267040173e5dc4d02096bb06b8e8beca4149c1f"
+    },
+    {
+      "region": "madrid",
+      "period": "2024-Q4",
+      "network": "mobile",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=mobile/year=2024/quarter=4/2024-10-01_performance_mobile_tiles.parquet",
+      "rows": 1362,
+      "sha256": "a95b464d8562e665611af942a08a5c4669dfbb04e3ece05d8ddba6d321a3986d"
+    },
+    {
+      "region": "fayetteville",
+      "period": "2024-Q4",
+      "network": "mobile",
+      "url": "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=mobile/year=2024/quarter=4/2024-10-01_performance_mobile_tiles.parquet",
+      "rows": 164,
+      "sha256": "3cb0a3b21dc0c6dd24804c76459d27f9fcb294b902035731913dbcb7a8ce819a"
+    }
+  ],
+  "data_kind": "observed_public_measurements",
+  "license": "CC BY-NC-SA 4.0",
+  "attribution": "Source: Speedtest by Ookla Global Fixed and Mobile Network Performance Maps.",
+  "limitations": [
+    "Volunteer tests are not a representative census of households.",
+    "Bounding boxes are study areas, not administrative boundaries.",
+    "Changes in tested tiles/devices can change aggregate averages.",
+    "Counts of devices are not additive across tiles or periods."
+  ]
+}
