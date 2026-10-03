@@ -1,56 +1,60 @@
-# Entender el proyecto
+# Entender Azure Operations Data Platform
 
-## Qué construimos
+## La historia
 
-Una web para comparar mediciones de velocidad de internet en dos zonas: Madrid y Fayetteville. Elegimos estas zonas por tu trayectoria en Madrid y Arkansas. Los datos son públicos, de Ookla, y corresponden a dos trimestres de 2024.
+Imagina una distribuidora de electrónica con cuatro almacenes: Centro, Leganés, Sanchinarro y Pedrezuela. Tres proveedores envían archivos con sus existencias, cada uno con nombres de columnas diferentes. Tu sistema recibe esos archivos, los revisa y prepara una vista común del inventario.
 
-La web responde: ¿qué velocidades se registraron?, ¿dónde aparecen mediciones más lentas?, ¿qué cambia entre los dos trimestres? No detecta averías en directo ni demuestra por qué cambió una conexión.
+La empresa y los datos son ficticios. El código, las comprobaciones y los servicios desplegados sí deben verificarse de verdad.
 
-## Las tres piezas
+## Las cinco piezas
 
-| Paso | Qué hace | Servicio de Azure | Código que debes leer |
-|---|---|---|---|
-| 1. Procesar | Descarga datos, selecciona las zonas y comprueba errores | Container Apps Job | `src/telecom_cloud/pipeline.py` |
-| 2. Guardar | Conserva el archivo de datos para que lo lea la web | Blob Storage | `src/telecom_cloud/storage.py` |
-| 3. Mostrar | Recibe los filtros, consulta los datos y entrega la web | Una Container App para API y web | `src/telecom_cloud/api.py` y `web/` |
+1. **Portal / API:** la web donde seleccionas el almacén y subes un archivo. Una API es la parte que recibe la petición y devuelve los resultados.
+2. **Blob Storage:** el lugar de Azure donde guardamos originales, estados y resultados. Piensa en archivos privados organizados por identificador.
+3. **Queue Storage:** la lista de trabajos pendientes. El mensaje lleva el identificador del archivo, no todo su contenido.
+4. **Container Apps Job:** el programa Python que se pone en marcha para revisar un archivo y termina al acabar.
+5. **Azure Monitor:** los registros que permiten comprobar qué ejecutó el programa y por qué falló.
 
-**Un contenedor** es un paquete con tu programa y lo necesario para ejecutarlo. **Una API** recibe una petición, por ejemplo «Madrid, móvil, cuarto trimestre», y devuelve los resultados. **Blob Storage** guarda archivos. **SQLite** permite consultar con SQL un archivo de datos; no es un servidor Azure SQL.
+Un contenedor empaqueta el programa y sus dependencias. El mismo paquete sirve para la web y el procesador, con comandos de inicio distintos. Esto simplifica su mantenimiento.
 
-El job se ejecuta cuando lo lanzas. La aplicación web es el componente al que entra el visitante. Son dos usos distintos del mismo código empaquetado.
+## Qué significa cada estado
 
-## Qué aporta cloud computing
+| Estado | Significado |
+|---|---|
+| En cola | El archivo está guardado y pendiente de trabajo |
+| Procesando | El worker ha tomado el archivo |
+| Completado | Todas las filas son válidas y el resultado está guardado |
+| Rechazado | Hay errores de datos; el inventario anterior se conserva |
+| Fallo técnico | Se agotaron los intentos de entrega; un operador revisa y reintenta |
 
-El objetivo del despliegue es que Azure ejecute el programa y sirva la web sin depender de que tu portátil esté encendido. Además aprenderás a configurar permisos, consultar errores y controlar el consumo.
+Un archivo rechazado necesita una corrección. Un fallo técnico puede resolverse sin cambiar los datos, por ejemplo recuperando acceso al almacenamiento.
 
-- **Azure Monitor:** consultar los registros para entender qué ocurrió.
-- **Managed identities:** permitir que el job escriba datos y que la web los lea, sin guardar contraseñas en el código.
-- **Bicep:** escribir la configuración de Azure en un archivo reproducible.
-- **Container Registry:** guardar el paquete de la aplicación. GitHub Actions lo construye y trata de subirlo al registro de Azure.
+## Un ejemplo que puedes defender
 
-Estas herramientas apoyan el proyecto; no son cuatro aplicaciones más que tengas que desarrollar.
+Nexo envía ocho portátiles al inventario declarado del almacén Centro. El archivo dice ocho unidades disponibles; no es una entrega que debamos sumar cada vez que llega. Si subes el mismo archivo dos veces, el resultado sigue siendo ocho. Una nueva fotografía corregida de dieciocho unidades sustituye la anterior del mismo proveedor, almacén y fecha. Una fotografía de una fecha más antigua nunca gana a una más nueva.
 
-## Lo que está funcionando y lo que falta
+El stock de proveedores diferentes se considera formado por lotes independientes. No implementamos ventas, reservas ni transferencias. Los totales usan la última fotografía válida de cada proveedor; pueden mezclar fechas y la web muestra esas fechas.
 
-La demo pública de GitHub Pages utiliza una copia de los datos. El procesamiento local, las consultas y las pruebas de CI están verificados. Azure for Students está activo. El despliegue de la aplicación en Azure todavía no está terminado: el primer flujo de construcción de imagen falló en el inicio de sesión de Azure.
+## Cómo aprenderlo en orden
 
-Por tanto, hoy puedes mostrar la demo y explicar el diseño. Solo podremos decir «ejecutado en Azure» cuando comprobemos allí la carga de datos y la web. La demo gratuita seguirá disponible como copia estática.
+1. Selecciona cada almacén en el mapa y compara los filtros con el selector de la parte superior.
+2. Descarga un ejemplo; abre sus cuatro columnas y relaciona una fila con un producto.
+3. Sigue el archivo en `api.py`, `service.py` y `validation.py`.
+4. Prueba duplicado, error y corrección; explica por qué el total debe cambiar o permanecer igual.
+5. En Azure, identifica almacenamiento, cola, portal y job. Comprueba una ejecución real y sus logs.
+6. Lee `infra/main.bicep`: relaciona cada recurso con una pieza que ya hayas usado.
+7. Revisa el gasto real. Una alerta avisa, pero no corta el consumo.
 
-## Aprenderlo en orden
+## Conceptos profesionales, con ejemplos
 
-1. **Usa la web.** Selecciona Madrid y después Fayetteville. Explica Mbps (velocidad) y ms (latencia). Cambia el mínimo de pruebas y observa qué puntos desaparecen.
-2. **Sigue un dato.** Abre `config.json`, identifica las zonas y los trimestres, y busca cómo `pipeline.py` los utiliza. Lee en `model.py` las comprobaciones antes de guardar.
-3. **Sigue una consulta.** Busca `/api/explore` en `api.py`: los filtros del usuario terminan en una consulta SQL. La web representa la respuesta.
-4. **Reconoce los recursos.** En el portal de Azure localiza el job, el almacenamiento y la app cuando estén desplegados. Relaciona cada uno con los tres pasos.
-5. **Comprueba un fallo y el coste.** Ejecuta las pruebas de datos inválidos, consulta los registros del job y revisa el consumo real en Azure.
+- **Idempotencia:** repetir el mismo archivo no duplica existencias.
+- **Procesamiento por eventos:** el trabajo comienza porque llega un mensaje a la cola.
+- **Identidad administrada:** Azure reconoce al programa y le concede permisos sin guardar una contraseña en el código.
+- **Infraestructura como código:** Bicep describe los recursos para recrearlos.
+- **Observabilidad:** los registros permiten explicar qué pasó con un archivo.
+- **CI:** GitHub ejecuta pruebas antes de dar por válida una versión.
 
-Después puedes estudiar los detalles de versiones de datos, permisos federados y recuperación en `ARCHITECTURE.md` y `RUNBOOK.md`. No necesitas empezar por ahí.
+## Demostración de tres minutos
 
-## Cómo explicarlo en una entrevista
+Selecciona Pedrezuela y muestra el inventario. Pasa a Centro, descarga el archivo con errores, súbelo y abre el resultado. Muestra la corrección y después vuelve a subirla para demostrar que no se duplica. Termina con una ejecución del job en Azure y una decisión que sepas justificar, por ejemplo separar la web del procesamiento.
 
-«Mi formación es de telecomunicaciones y ahora trabajo con datos. Elegí mediciones públicas de internet en Madrid y Fayetteville para practicar un flujo completo en Azure: procesar con Python, guardar los resultados y servir una web. Puedo filtrar por zona, tipo de conexión y trimestre. Separé la tarea que actualiza datos de la aplicación que los consulta.»
-
-Añade siempre el estado real del despliegue. No memorices una lista de servicios: demuestra una decisión, una consulta y una comprobación. Si te preguntan por herramientas de IA, explica con honestidad cómo las usaste y qué has comprendido y verificado tú.
-
-## Azure for Students y el coste
-
-Usamos la suscripción de estudiante del proyecto, con crédito de 100 USD por hasta 12 meses según la oferta. El crédito no significa que cada recurso sea gratis: el registro de contenedores, el almacenamiento y la ejecución pueden consumirlo. Hay una alerta de 5 USD/mes; una alerta no detiene el gasto. Conservamos el límite de gasto de la oferta y no cambiamos a pago por uso.
+La copia estática permite navegar, pero no subir. En Azure los ejemplos pasan por almacenamiento y cola reales. El modo local permite practicar con archivos propios. Consulta VERIFICATION.md antes de afirmar qué partes se han verificado en Azure.

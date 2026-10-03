@@ -1,25 +1,21 @@
-# Professional presentation drafts — not published
+# Professional descriptions — drafts, not published profile edits
 
-## Project title
-Azure Cloud Data Platform for Telecom Analytics
+## Project name
 
-## Current truthful description
-Built and locally validated a telecom analytics platform using Python, SQL and public connectivity measurements. Implemented Azure infrastructure as code, managed-identity access design, container deployment workflows and a reproducible static portfolio demo. Cloud deployment verification is pending.
+Azure Operations Data Platform — Electronics Distribution
 
-## CV bullet supported by current local evidence
-Built a reproducible Python/SQL platform analyzing 7,403 public telecom tile-period observations across two study areas, with automated data-quality gates, atomic releases and an interactive dashboard; authored Azure Bicep infrastructure and deployment workflows.
+## What the implementation demonstrates
 
-## Add only after cloud acceptance passes
-Deployed and operated the platform on Azure Container Apps and Blob Storage using managed identities, scoped RBAC, OIDC-based CI/CD and Azure Monitor. Include actual measured cloud duration/cost only after verification.
+Built a Python platform that validates supplier inventory files, rejects invalid snapshots, prevents duplicate processing, and consolidates warehouse stock through SQL. Designed an Azure deployment using Container Apps, an event-driven processing job, Blob/Queue Storage, managed identities, Bicep and execution logs. The Spanish portal includes warehouse selection on an interactive Madrid map, upload results and inventory export.
 
-## LinkedIn draft for the verified local milestone
-I’m building an Azure-focused data engineering project that connects my telecommunications background with analytics: a connectivity observatory for Madrid and Fayetteville.
+Use “deployed and verified on Azure” only after VERIFICATION.md records the successful cloud acceptance checks. Do not claim Azure SQL, Data Factory, production clients, savings, enterprise scale or professional cloud tenure from this project.
 
-The working local version processes 7,403 public tile-period observations, validates every partition and serves an interactive map through a read-only SQL API. The cloud design includes Container Apps, Blob Storage, managed identities, infrastructure as code and deployment automation.
+## Short interview explanation
 
-One important lesson: a working dashboard is only part of the system. Reliable publication, recovery after bad input and honest interpretation of measurement coverage matter just as much.
+“My background combines telecommunications engineering with statistics and data analysis. I built this project to learn how to operate a data workflow in Azure. A fictional electronics distributor receives inventory files in three formats. I validate them, preserve the originals, handle duplicates and failures, and expose the results through a web application. I can trace one file from upload through processing to the final inventory.”
 
-Next milestone: verify the deployment and operating costs in an authorized Azure subscription.
+## Evidence to show
 
-## Portfolio content
-Lead with the connectivity question, show the working demo, then link to architecture, tests and source provenance. Label static snapshot versus live Azure clearly. Include repository and live links only after they exist. Do not add production experience, uptime, savings or hiring outcomes without evidence.
+One accepted file, one rejected file, one correction, one duplicate; the job execution and logs; the scoped identities; the Bicep template; one genuine cost observation. Describe any AI assistance honestly and explain the decisions and tests you personally understand.
+
+No LinkedIn post or professional-profile edit has been published by this implementation.

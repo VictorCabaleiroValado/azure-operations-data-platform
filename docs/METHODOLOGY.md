@@ -1,29 +1,21 @@
-# Data methodology
+# Data contract and calculations
 
-Source: Ookla Open Data, https://github.com/teamookla/ookla-open-data. Source metadata and URL patterns were checked against that repository. Initial data was read from the public S3 HTTPS Parquet objects on 3 October 2026. The source manifest records URLs, source periods, row counts and normalized logical SHA-256 digests. Digests identify selected records, not the full remote object bytes.
+All business data is synthetic. Four approximate warehouse coordinates are used only for demonstration: Madrid Centro (40.4169,-3.7038), Leganés (40.3270,-3.7653), Sanchinarro (40.4943,-3.6598), Pedrezuela (40.7424,-3.6001). Map tiles are OpenStreetMap cartography, not evidence of actual premises.
 
-## Population and grain
+## Input grain
 
-One record = region + quarter + connection type + zoom-16 quadkey. Selection includes a tile if its centroid lies within an inclusive bounding rectangle. Regions are study areas, not administrative boundaries. Each tile can occur in multiple quarters and connection types: 7,403 observations do not mean 7,403 unique geographic tiles.
+A CSV is a complete inventory snapshot for one supplier, one warehouse and one date. One row is one canonical product SKU. Three explicit formats are defined in `catalog.py`; header order and delimiters must match the downloaded example. Encoding: UTF-8, optional BOM. Maximum 512 KiB / 5,000 rows. The demo catalogue contains twelve SKUs.
 
-Fields: longitude, latitude, average download/upload in kbps, average latency in ms, tests and distinct devices within that source tile-period. The base source records with valid positive counts are retained. A minimum-test UI filter changes the eligible population consistently in the map, metrics, trend, review list and CSV export.
+Checks: known SKU, no duplicate SKU within a file, integer quantity 0–100,000, positive cost with at most two decimals, valid ISO date from 2020 through today, a common date across all rows, non-empty input, exact column count. Any row error rejects the entire snapshot. Empty snapshots are rejected to avoid accidental inventory erasure; supply a zero-quantity row for explicit zero stock.
 
-## Aggregation
+## Versions and identity
 
-Download Mbps = sum(tile mean download kbps × tile tests) / sum(tile tests) / 1,000.
-Upload is analogous. Latency = sum(tile mean latency ms × tile tests) / sum(tile tests).
-Source means are rounded, so reconstructed aggregates are approximate. Devices are never summed across tiles or periods. Tests are summed only within the explicitly selected population.
+The run ID hashes contract version, supplier, warehouse and original bytes. Identical content for the same context returns the original ID, even if renamed. Formatting changes create another run, but publication replaces the supplier snapshot rather than adding stock. The latest valid snapshot is selected by `(snapshot_date, received_at, run_id)`. This makes out-of-order arrivals safe; later corrected uploads win same-date ties. Re-uploading an already processed file preserves its original receipt time.
 
-The trend independently applies the same threshold to each quarter. The matched-tile measure intersects eligible quadkeys for the selected and prior configured quarter, then averages each tile's speed difference with equal weights. It is distinct from a difference in test-weighted regional means. Neither establishes causation.
+A newer complete snapshot removes products absent from the previous snapshot for that supplier/warehouse. Supplier holdings are assumed to be disjoint physical lots. This assumption must be verified before using the model with a real business.
 
-## Quality contract
+## SQL and metrics
 
-Reject empty partitions, duplicate keys, invalid quadkeys, unexpected columns, non-finite or negative performance values, out-of-region centroids, non-positive or fractional counts, and devices exceeding tests. Publish only if the stored row count reconciles with all configured partitions. Missing data is displayed as missing, never zero speed.
+DuckDB SQL groups normalized records by warehouse, SKU, product and category. Quantity is summed over independent suppliers. Value at cost is `SUM(quantity * unit_cost_cents)` in integer cents, not revenue or retail valuation. Distinct references counts distinct SKUs within the selected warehouses. Low stock counts product/warehouse combinations with quantity < 10; it is a fixed demo threshold, not a forecast or purchasing recommendation.
 
-## Limitations
-
-Participants self-select tests. Repeated tests are not independent random samples. Device, access technology, provider, time of day and test conditions may change. Small test counts offer limited evidence; filtering them also changes coverage. No inference about all households, coverage, outage incidence, provider performance or causes of change is warranted. Historical data is not a live assessment of current connectivity.
-
-## Licensing
-
-Ookla data and redistributed derived datasets retain CC BY-NC-SA 4.0. The repository carries separate code and data licenses. Source attribution and transformation descriptions are visible in the application. No trademark permission, endorsement or affiliation is claimed.
+The UI displays source dates and oldest/newest dates when records are combined. It does not invent a common observation time. Process duration excludes time waiting in the queue and container startup. No savings, SLA or production-scale performance claims are made.

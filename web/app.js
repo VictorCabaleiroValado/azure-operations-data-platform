@@ -1,64 +1,210 @@
+/* The browser displays API results; processing and SQL run on the server. */
 'use strict';
-const $ = id => document.getElementById(id);
-let meta, release, snapshotData, view, requestVersion = 0;
-const fmt = (v, n=1) => v === null || v === undefined ? '—' : Number(v).toLocaleString('en-US',{maximumFractionDigits:n});
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function weighted(rows){const tests=rows.reduce((s,r)=>s+r.tests,0);return {tiles:rows.length,tests,download_mbps:tests?rows.reduce((s,r)=>s+r.download_kbps*r.tests,0)/tests/1000:null,upload_mbps:tests?rows.reduce((s,r)=>s+r.upload_kbps*r.tests,0)/tests/1000:null,latency_ms:tests?rows.reduce((s,r)=>s+r.latency_ms*r.tests,0)/tests:null};}
-function localView(region,network,period,minimum_tests){
- const selected=snapshotData.rows.filter(r=>r.region===region&&r.network===network&&r.tests>=minimum_tests), rows=selected.filter(r=>r.period===period);
- const i=release.config.periods.indexOf(period);let comparison=null;
- if(i>0){const p=release.config.periods[i-1],old=new Map(selected.filter(r=>r.period===p).map(r=>[r.quadkey,r])),common=rows.filter(r=>old.has(r.quadkey));comparison={previous_period:p,matched_tiles:common.length,download_change_mbps:common.length?common.reduce((s,r)=>s+(r.download_kbps-old.get(r.quadkey).download_kbps)/1000,0)/common.length:null};}
- return {selection:{region,network,period,minimum_tests},summary:weighted(rows),tiles:rows,trend:release.config.periods.map(p=>({period:p,...weighted(selected.filter(r=>r.period===p))})),comparison,excluded_tiles:snapshotData.rows.filter(r=>r.region===region&&r.network===network&&r.period===period).length-rows.length,review_thresholds:{download_mbps:release.config.review_download_mbps,latency_ms:release.config.review_latency_ms}};
+const $ = (selector) => document.querySelector(selector);
+const money = (cents) => new Intl.NumberFormat('es-ES', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(cents / 100);
+const number = (value) => new Intl.NumberFormat('es-ES').format(value);
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+const labels = {queued: 'En cola', processing: 'Procesando', completed: 'Completado', rejected: 'Rechazado', failed: 'Fallo técnico'};
+const titles = {overview: 'Operaciones de almacén', inventory: 'Inventario', upload: 'Recepción de archivos', runs: 'Procesamientos', cloud: 'El sistema en Azure'};
+let catalog, data, runtime, map, markers = [], selection = '', activeTab = 'overview', refreshBusy = false;
+
+async function json(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(typeof body.detail === 'string' ? body.detail : `Error ${response.status}. No se ha completado la operación.`);
+  }
+  return response.json();
 }
-async function load(){
- const version=++requestVersion; const p=new URLSearchParams({region:$('region').value,network:$('network').value,period:$('period').value,minimum_tests:$('minimum').value});
- try{let result;if(snapshotData)result=localView(p.get('region'),p.get('network'),p.get('period'),+p.get('minimum_tests'));else{const r=await fetch(`./api/explore?${p}`);if(!r.ok)throw Error(`Data API returned ${r.status}`);result=await r.json();}if(version!==requestVersion)return;view=result;$('error').hidden=true;render();}catch(e){if(version!==requestVersion)return;$('error').hidden=false;$('error').textContent='Unable to load this selection. '+e.message;}
+
+function filteredState(source, warehouse) {
+  const inventory = source.inventory.filter((row) => !warehouse || row.warehouse === warehouse);
+  const runs = source.runs.filter((row) => !warehouse || row.warehouse === warehouse);
+  return {inventory, runs, units: inventory.reduce((sum, row) => sum + row.quantity, 0), value: inventory.reduce((sum, row) => sum + row.value_cents, 0), references: new Set(inventory.map((row) => row.sku)).size, low: inventory.filter((row) => row.quantity < 10).length};
 }
-function render(){
- for(const [id,key] of [['download','download_mbps'],['upload','upload_mbps'],['latency','latency_ms'],['tests','tests']])$(id).textContent=fmt(view.summary[key],id==='tests'?0:1);
- $('tiles').textContent=`${fmt(view.summary.tiles,0)} tiles · ${fmt(view.excluded_tiles,0)} excluded by test threshold`;
- const max=Math.max(1,...view.trend.map(r=>r.download_mbps||0));
- $('trend').innerHTML=view.trend.map(r=>`<div class="trend-row"><span>${esc(r.period)}</span><div class="bar-track"><div class="bar-fill" style="width:${(r.download_mbps||0)/max*100}%"></div></div><strong>${fmt(r.download_mbps)}</strong></div>`).join('');
- const c=view.comparison;$('comparison').textContent=c&&c.matched_tiles?`Matched tiles: ${fmt(c.download_change_mbps)} Mbps mean change vs ${c.previous_period}, across ${fmt(c.matched_tiles,0)} common tiles. Equal tile weights; changing samples may affect results.`:(c?'No tiles meet the test threshold in both comparison periods.':'Select a later quarter to compare the same tiles across periods.');
- const t=view.review_thresholds, flagged=view.tiles.filter(r=>r.download_kbps/1000<t.download_mbps||r.latency_ms>t.latency_ms).sort((a,b)=>a.download_kbps-b.download_kbps||b.latency_ms-a.latency_ms);
- $('threshold-note').textContent=`Download below ${t.download_mbps} Mbps or latency above ${t.latency_ms} ms.`;
- $('review-count').textContent=`${fmt(flagged.length,0)} tiles`;
- $('coverage').textContent=`${fmt(view.excluded_tiles,0)} tiles excluded for having fewer than ${view.selection.minimum_tests} tests.`;
- $('table-count').textContent=`Showing ${Math.min(30,flagged.length)} of ${fmt(flagged.length,0)}`;
- $('rows').innerHTML=flagged.slice(0,30).map(r=>`<tr><td>${esc(r.quadkey)}</td><td>${fmt(r.download_kbps/1000)}</td><td>${fmt(r.upload_kbps/1000)}</td><td>${fmt(r.latency_ms)}</td><td>${fmt(r.tests,0)}</td><td>${fmt(r.latitude,4)}, ${fmt(r.longitude,4)}</td></tr>`).join('')||'<tr><td colspan="6">No tiles meet the review criteria in this selection.</td></tr>';
- $('map-selection').textContent='Select a point to inspect its measurements.';drawMap();
+
+function warehouseName(id) { return catalog.warehouses.find((w) => w.id === id)?.name || id; }
+function supplierName(id) { return catalog.suppliers.find((s) => s.id === id)?.name || id; }
+function badge(status) { return `<span class="status ${escapeHtml(status)}">${escapeHtml(labels[status] || status)}</span>`; }
+function dateTime(value) { return value ? new Date(value).toLocaleString('es-ES', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—'; }
+function empty(message) { return `<div class="empty">${escapeHtml(message)}</div>`; }
+
+function runTable(records) {
+  if (!records.length) return empty('No hay archivos en esta selección.');
+  return `<table><thead><tr><th>Archivo / proveedor</th><th>Almacén</th><th>Estado</th><th>Filas</th><th>Recibido</th></tr></thead><tbody>${records.map((r) => `<tr><td><button class="row-button" data-run="${r.id}">${escapeHtml(r.filename)}</button><small>${escapeHtml(supplierName(r.supplier))}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${badge(r.status)}</td><td>${r.row_count || '—'}</td><td>${dateTime(r.received_at)}</td></tr>`).join('')}</tbody></table>`;
 }
-function drawMap(){
- if(!view)return;const box=release.config.regions.find(r=>r.id===view.selection.region).bbox,metric=$('metric').value,isSpeed=metric==='download_kbps';
- const values=view.tiles.map(r=>r[metric]/(isSpeed?1000:1)),lo=values.length?Math.min(...values):0,hi=values.length?Math.max(...values):0;
- const W=760,H=410,P=42,merc=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
- const x=lon=>P+(lon-box[0])/(box[2]-box[0])*(W-2*P), y=lat=>H-P-(merc(lat)-merc(box[1]))/(merc(box[3])-merc(box[1]))*(H-2*P);
- let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(view.selection.region)} geographic measurement map"><rect width="760" height="410" fill="#edf3f6"/>`;
- for(let i=0;i<=4;i++){const lon=box[0]+i*(box[2]-box[0])/4,lat=box[1]+i*(box[3]-box[1])/4;svg+=`<line x1="${x(lon)}" x2="${x(lon)}" y1="${P}" y2="${H-P}" stroke="#d3e0e7"/><line x1="${P}" x2="${W-P}" y1="${y(lat)}" y2="${y(lat)}" stroke="#d3e0e7"/><text x="${x(lon)}" y="${H-15}" font-size="11" fill="#6b8290" text-anchor="middle">${lon.toFixed(2)}°</text><text x="4" y="${y(lat)}" font-size="10" fill="#6b8290">${lat.toFixed(2)}°</text>`;}
- view.tiles.forEach((r,i)=>{const v=values[i],z=hi>lo?(v-lo)/(hi-lo):.5,col=`hsl(${isSpeed?201:25} 65% ${80-z*55}%)`;svg+=`<circle data-index="${i}" cx="${x(r.longitude)}" cy="${y(r.latitude)}" r="3.1" fill="${col}" stroke="white" stroke-width=".4"><title>${esc(r.quadkey)}: ${fmt(v)} ${isSpeed?'Mbps':'ms'}, ${r.tests} tests</title></circle>`;});
- if(!values.length)svg+='<text x="380" y="210" text-anchor="middle" fill="#607b8c">No measurements meet this test threshold.</text>';
- $('map').innerHTML=svg+'</svg>';
- $('legend').innerHTML=`<span>${fmt(lo)} ${isSpeed?'Mbps':'ms'}</span><div class="legend-bar" style="${isSpeed?'':'background:linear-gradient(90deg,hsl(25 65% 80%),hsl(25 65% 25%))'}"></div><span>${fmt(hi)} ${isSpeed?'Mbps':'ms'}</span><span>Range in current view</span>`;
- $('map').querySelectorAll('circle').forEach(el=>el.addEventListener('click',()=>{const r=view.tiles[+el.dataset.index];$('map-selection').textContent=`Tile ${r.quadkey} · ${fmt(r.download_kbps/1000)} Mbps down · ${fmt(r.upload_kbps/1000)} Mbps up · ${fmt(r.latency_ms)} ms · ${fmt(r.tests,0)} tests · ${fmt(r.devices,0)} devices`; }));
+
+function visibleInventory() {
+  const query = $('#search').value.trim().toLowerCase();
+  return filteredState(data, selection).inventory.filter((r) => (!query || `${r.sku} ${r.product}`.toLowerCase().includes(query)) && (!$('#only-low').checked || r.quantity < 10));
 }
-function csv(){if(!view)return;const cols=['region','period','network','quadkey','longitude','latitude','download_kbps','upload_kbps','latency_ms','tests','devices'];const text=[cols.join(','),...view.tiles.map(r=>cols.map(k=>JSON.stringify(r[k])).join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'}));a.download=`telecom-${view.selection.region}-${view.selection.network}-${view.selection.period}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-async function init(){
- try{
-  // Static mode is explicit via configuration file, never a silent fallback for a failed live API.
-  const settings=await fetch('./assets/mode.json').then(r=>r.ok?r.json():{mode:'api'});
-  if(settings.mode==='snapshot'){snapshotData=await fetch('./assets/demo.json').then(r=>{if(!r.ok)throw Error('Snapshot missing');return r.json();});meta=snapshotData.metadata;}else{const r=await fetch('./api/metadata');if(!r.ok)throw Error('Run the pipeline to create a data release.');meta=await r.json();}
-  release=meta.release;
-  $('mode').textContent=snapshotData?'Static data snapshot':meta.runtime.mode==='azure'?'Azure runtime':'Local runtime';
-  $('release-date').textContent=release.config.periods.join(' → ');
-  $('release-info').textContent=`${fmt(release.rows,0)} tile observations · ${release.partitions} validated partitions`;
-  const options=(id,items)=>{$(id).innerHTML=items.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');};
-  options('region',release.config.regions.map(r=>[r.id,r.name]));options('network',release.config.networks.map(n=>[n,n==='fixed'?'Fixed broadband':'Mobile']));options('period',release.config.periods.map(p=>[p,p]));$('period').value=release.config.periods.at(-1);
-  $('cloud-status').textContent=`Current view: ${snapshotData?'static snapshot':meta.runtime.mode+' runtime'}. Architecture below describes the deployment design; Azure execution and cost require separate live verification.`;
-  $('run-facts').innerHTML=[['Rows',fmt(release.rows,0)],['Partitions',release.partitions],['Changed partitions',release.changed_partitions],['Build duration',fmt(release.duration_seconds)+' s']].map(([k,v])=>`<div><span>${k}</span><strong>${v}</strong></div>`).join('');
-  $('provenance').textContent=`Data retrieved and release generated: ${new Date(release.generated_at).toISOString()}. Release ID: ${release.run_id}.`;$('sources').textContent=JSON.stringify(release.sources,null,2);
-  for(const id of ['region','network','period','minimum'])$(id).addEventListener('change',load);$('metric').addEventListener('change',drawMap);$('export').addEventListener('click',csv);
-  document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.hidden=t.id!==b.dataset.tab);document.querySelectorAll('nav button').forEach(n=>n.classList.toggle('active',n===b));}));
-  await load();
- }catch(e){$('error').hidden=false;$('error').textContent=e.message;$('mode').textContent='Data unavailable';}
+
+function renderInventory() {
+  const rows = visibleInventory();
+  $('#inventory-count').textContent = `${rows.length} productos / almacén`;
+  $('#inventory-table').innerHTML = rows.length ? `<table><thead><tr><th>Producto</th><th>Almacén</th><th>Categoría</th><th>Unidades</th><th>Valor a coste</th><th>Fecha de stock</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escapeHtml(r.product)}<small>${escapeHtml(r.sku)}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${escapeHtml(r.category)}</td><td class="${r.quantity < 10 ? 'low' : ''}">${number(r.quantity)}${r.quantity < 10 ? ' · revisar' : ''}</td><td>${money(r.value_cents)}</td><td>${escapeHtml(r.oldest_snapshot)}${r.oldest_snapshot !== r.newest_snapshot ? ' – ' + escapeHtml(r.newest_snapshot) : ''}</td></tr>`).join('')}</tbody></table>` : empty('No hay productos con estos filtros.');
+}
+
+function render() {
+  const view = filteredState(data, selection);
+  $('#units').textContent = number(view.units);
+  $('#value').textContent = money(view.value);
+  $('#references').textContent = view.references;
+  $('#low-stock').textContent = view.low;
+  $('#run-scope').textContent = selection ? warehouseName(selection) : 'Todos los almacenes';
+  $('#run-summary').innerHTML = ['completed', 'rejected', 'queued', 'processing', 'failed'].map((status) => `<div class="status-line"><span><i class="status-dot ${status}"></i>${labels[status]}</span><strong>${view.runs.filter((r) => r.status === status).length}</strong></div>`).join('');
+  $('#recent-runs').innerHTML = runTable(view.runs.slice(0, 5));
+  $('#runs-table').innerHTML = runTable(view.runs.filter((r) => !$('#status-filter').value || r.status === $('#status-filter').value));
+  const newest = view.runs.find((r) => r.status === 'completed');
+  $('#freshness').textContent = newest ? `Última carga válida: ${dateTime(newest.finished_at)}` : 'Sin cargas válidas';
+  document.querySelectorAll('[data-warehouse]').forEach((b) => b.classList.toggle('selected', b.dataset.warehouse === selection));
+  markers.forEach(({marker, warehouse, index}) => marker.setIcon(markerIcon(warehouse.id, index)));
+  renderInventory();
+}
+
+function chooseWarehouse(id) {
+  selection = id;
+  $('#warehouse').value = id;
+  if (id) { $('#upload-warehouse').value = id; updateSamples(); }
+  render();
+}
+
+function markerIcon(id, index) {
+  return L.divIcon({className: '', html: `<span class="warehouse-marker ${selection === id ? 'selected' : ''}">${index + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15]});
+}
+
+function initializeMap() {
+  if (!window.L) { $('#map-fallback').hidden = false; return; }
+  map = L.map('map', {scrollWheelZoom: false}).setView([40.423, -3.68], 10);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  catalog.warehouses.forEach((warehouse, index) => {
+    const marker = L.marker([warehouse.lat, warehouse.lon], {icon: markerIcon(warehouse.id, index), title: `Seleccionar ${warehouse.name}`, keyboard: true}).addTo(map);
+    marker.getElement()?.setAttribute('aria-label', `Seleccionar ${warehouse.name}`);
+    marker.bindTooltip(`${warehouse.code} · ${warehouse.name}`);
+    marker.on('click', () => chooseWarehouse(selection === warehouse.id ? '' : warehouse.id));
+    markers.push({marker, warehouse, index});
+  });
+  map.fitBounds(catalog.warehouses.map((w) => [w.lat, w.lon]), {padding: [30, 30], maxZoom: 10});
+}
+
+function showTab(id) {
+  activeTab = id;
+  document.querySelectorAll('.view').forEach((section) => { section.hidden = section.id !== id; });
+  document.querySelectorAll('[data-tab]').forEach((button) => { button.classList.toggle('active', button.dataset.tab === id); button.setAttribute('aria-current', button.dataset.tab === id ? 'page' : 'false'); });
+  $('#page-title').textContent = titles[id];
+  if (id === 'overview' && map) requestAnimationFrame(() => map.invalidateSize());
+}
+
+function updateSamples() {
+  const matches = catalog.samples.filter((s) => s.supplier === $('#supplier').value && s.warehouse === $('#upload-warehouse').value);
+  $('#sample').innerHTML = matches.map((s) => `<option value="${escapeHtml(s.file)}">${escapeHtml(s.label)}</option>`).join('');
+  updateDownload();
+}
+function updateDownload() {
+  const file = $('#sample').value;
+  $('#download-sample').href = runtime === 'snapshot' ? `./samples/${encodeURIComponent(file)}` : `./api/samples/${encodeURIComponent(file)}`;
+  $('#download-sample').download = file;
+}
+
+async function refresh(silent = false) {
+  if (refreshBusy) return;
+  refreshBusy = true;
+  try {
+    if (runtime !== 'snapshot') data = await json('./api/state');
+    render();
+    $('#error').hidden = true;
+  } catch (error) {
+    if (!silent) { $('#error').textContent = error.message; $('#error').hidden = false; }
+  } finally { refreshBusy = false; }
+}
+
+async function upload(event) {
+  event.preventDefault();
+  if (runtime === 'snapshot') return;
+  const file = $('#file').files[0];
+  if (!file) return;
+  $('#submit').disabled = true;
+  $('#upload-result').textContent = 'Enviando archivo…';
+  try {
+    if (file.size > 512 * 1024) throw new Error('El archivo supera 512 KiB.');
+    const params = new URLSearchParams({supplier: $('#supplier').value, warehouse: $('#upload-warehouse').value, filename: file.name});
+    const result = await json(`./api/uploads?${params}`, {method: 'POST', headers: {'Content-Type': 'text/csv'}, body: file});
+    $('#upload-result').innerHTML = `<div class="success-message">${result.duplicate ? 'Archivo ya registrado: se conserva el procesamiento original.' : 'Archivo recibido. El procesador actualizará su estado.'}<br><button class="row-button" data-run="${result.id}">Consultar procesamiento →</button></div>`;
+    await refresh();
+  } catch (error) { $('#upload-result').textContent = error.message; }
+  finally { $('#submit').disabled = false; }
+}
+
+async function detail(id) {
+  try {
+    const run = runtime === 'snapshot' ? data.runs.find((r) => r.id === id) : await json(`./api/runs/${id}`);
+    if (!run) return;
+    $('#detail-content').innerHTML = `<p class="eyebrow">DETALLE DE PROCESAMIENTO</p><h2>${escapeHtml(run.filename)}</h2>${badge(run.status)}<div class="detail-facts"><div><span>Almacén</span><strong>${escapeHtml(warehouseName(run.warehouse))}</strong></div><div><span>Proveedor</span><strong>${escapeHtml(supplierName(run.supplier))}</strong></div><div><span>Filas leídas</span><strong>${run.row_count}</strong></div><div><span>Intentos de proceso</span><strong>${run.attempts}</strong></div><div><span>Duración de proceso</span><strong>${run.duration_ms === null ? '—' : number(run.duration_ms) + ' ms'}</strong></div><div><span>Fecha del inventario</span><strong>${escapeHtml(run.snapshot_date || '—')}</strong></div><div><span>Entorno de ejecución registrado</span><strong>${escapeHtml(run.runtime)}</strong></div><div><span>Finalizado</span><strong>${dateTime(run.finished_at)}</strong></div></div><p class="muted">ID: ${escapeHtml(run.id)}</p>${run.errors.length ? `<ul class="error-list">${run.errors.slice(0, 100).map((e) => `<li><b>${e.line ? 'Línea ' + e.line : 'Archivo'}:</b> ${escapeHtml(e.message)}</li>`).join('')}</ul><p class="muted">${run.errors.length} errores. Corrige el archivo y vuelve a enviarlo.</p>` : `<p>${run.status === 'completed' ? 'Todas las filas son válidas. Esta fotografía participa en el inventario si es la versión más reciente del proveedor y almacén.' : 'El archivo todavía no ha publicado un resultado válido.'}</p>`}`;
+    if (!$('#detail').open) $('#detail').showModal();
+  } catch (error) { $('#error').textContent = error.message; $('#error').hidden = false; }
+}
+
+function csvText(rows) {
+  const fields = ['warehouse','sku','product','category','quantity','value_cents','suppliers','oldest_snapshot','newest_snapshot'];
+  const quote = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  return '\uFEFF' + [fields, ...rows.map((r) => fields.map((f) => r[f]))].map((row) => row.map(quote).join(',')).join('\r\n') + '\r\n';
+}
+function downloadInventory() {
+  const url = URL.createObjectURL(new Blob([csvText(visibleInventory())], {type: 'text/csv;charset=utf-8'}));
+  const link = document.createElement('a');
+  link.href = url; link.download = `inventario-${selection || 'madrid'}.csv`; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function init() {
+  try {
+    const mode = await json('./assets/mode.json');
+    if (mode.mode === 'snapshot') {
+      const snapshot = await json('./assets/demo.json');
+      catalog = snapshot.catalog; data = snapshot.state; runtime = 'snapshot';
+    } else {
+      [catalog, data] = await Promise.all([json('./api/catalog'), json('./api/state')]);
+      runtime = catalog.runtime;
+    }
+    $('#runtime').textContent = {snapshot: 'Demo estática', local: 'Ejecución local', azure: 'Conectado a Azure'}[runtime];
+    const note = {snapshot: 'Copia de consulta: los filtros y el mapa funcionan; la carga de archivos requiere la aplicación conectada a Azure o el modo local.', local: 'Procesamiento real en este equipo. Los datos de negocio son sintéticos.', azure: 'Almacenamiento y procesamiento en Azure. La demo pública acepta los ejemplos descargables; las ejecuciones pueden tardar un minuto en comenzar.'}[runtime];
+    $('#runtime-note').textContent = note;
+    if (mode.cloud_url) {
+      const url = new URL(mode.cloud_url);
+      if (url.protocol === 'https:' && url.hostname.endsWith('.azurecontainerapps.io')) {
+        const link = document.createElement('a'); link.href = url.href; link.textContent = ' Abrir aplicación Azure ↗'; $('#runtime-note').append(link);
+      }
+    }
+    $('#cloud-proof').textContent = runtime === 'azure' ? 'Esta web está conectada al almacenamiento de Azure. En cada procesamiento puedes comprobar el entorno y la duración registrados por el worker.' : 'Esta vista explica la arquitectura. El entorno actual es ' + (runtime === 'local' ? 'local' : 'una copia estática') + '; no representa una ejecución nueva en Azure.';
+    const options = catalog.warehouses.map((w) => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('');
+    $('#warehouse').insertAdjacentHTML('beforeend', options);
+    $('#upload-warehouse').innerHTML = options;
+    $('#supplier').innerHTML = catalog.suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+    $('#supplier-formats').innerHTML = catalog.suppliers.map((s) => `<div class="format"><h3>${escapeHtml(s.name)}</h3><code>${escapeHtml(s.fields.join(s.delimiter + ' '))}</code></div>`).join('');
+    $('#warehouse-buttons').innerHTML = catalog.warehouses.map((w, i) => `<button data-warehouse="${w.id}">${i + 1} · ${escapeHtml(w.name.replace('Madrid ', ''))}</button>`).join('');
+    $('#upload-policy').textContent = runtime === 'snapshot' ? 'La carga está desactivada en esta copia estática. Usa la aplicación Azure o ejecuta el proyecto localmente.' : runtime === 'azure' ? 'Demo pública: solo los ejemplos descargables del proveedor y almacén seleccionados. Para archivos propios, usa el modo local.' : 'Modo local: puedes editar los ejemplos y cargar tus propios CSV con el formato indicado.';
+    $('#submit').disabled = runtime === 'snapshot';
+    $('#file').disabled = runtime === 'snapshot';
+    updateSamples();
+    initializeMap();
+    render();
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+    document.querySelectorAll('[data-warehouse]').forEach((b) => b.addEventListener('click', () => chooseWarehouse(selection === b.dataset.warehouse ? '' : b.dataset.warehouse)));
+    $('#warehouse').addEventListener('change', (e) => chooseWarehouse(e.target.value));
+    $('#go-upload').addEventListener('click', () => showTab('upload'));
+    $('#all-runs').addEventListener('click', () => showTab('runs'));
+    $('#refresh').addEventListener('click', () => refresh());
+    $('#search').addEventListener('input', renderInventory);
+    $('#only-low').addEventListener('change', renderInventory);
+    $('#status-filter').addEventListener('change', render);
+    $('#supplier').addEventListener('change', updateSamples);
+    $('#upload-warehouse').addEventListener('change', updateSamples);
+    $('#sample').addEventListener('change', updateDownload);
+    $('#upload-form').addEventListener('submit', upload);
+    $('#export').addEventListener('click', downloadInventory);
+    document.addEventListener('click', (event) => { const button = event.target.closest('[data-run]'); if (button) detail(button.dataset.run); });
+    $('.dialog-close').addEventListener('click', () => $('#detail').close());
+    if (runtime !== 'snapshot') setInterval(() => { if (!document.hidden) refresh(true); }, 12000);
+  } catch (error) { $('#error').textContent = 'No se han podido cargar los datos: ' + error.message; $('#error').hidden = false; $('#runtime').textContent = 'Sin conexión'; }
 }
 init();

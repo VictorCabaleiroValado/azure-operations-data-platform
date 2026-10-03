@@ -1,23 +1,17 @@
 targetScope = 'resourceGroup'
 
-@description('Short lowercase project name; resources are scoped to a dedicated resource group.')
-@minLength(3)
-@maxLength(11)
-param prefix string = 'telecom'
+@description('Dedicated portfolio resources; no departmental subscriptions.')
+param prefix string = 'operations'
 param location string = resourceGroup().location
-@description('Public container image, pinned to an immutable digest for releases. No registry credential required.')
+@description('Container image pinned to its immutable digest.')
 param image string
-@description('Optional existing Azure Container Registry in this resource group. Leave empty for a public image.')
-param registryName string = ''
-@description('Deploy manually first. Enabling schedules is a separate operational decision.')
-param enableSchedule bool = false
-@description('Bootstrap with false, publish the first data release, then deploy with true.')
-param deployApi bool = true
-param tags object = { project: 'azure-telecom-cloud', purpose: 'portfolio' }
+@description('Existing project registry; GitHub build identity is scoped to this registry only.')
+param registryName string = 'telecomvc53728'
+param tags object = { project: 'azure-operations-data-platform', purpose: 'student-portfolio' }
 var suffix = uniqueString(resourceGroup().id)
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: '${prefix}${suffix}'
+  name: 'ops${suffix}'
   location: location
   tags: tags
   sku: { name: 'Standard_LRS' }
@@ -27,7 +21,6 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     supportsHttpsTrafficOnly: true
     allowBlobPublicAccess: false
     allowSharedKeyAccess: false
-    publicNetworkAccess: 'Enabled'
   }
 }
 resource blobs 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
@@ -38,68 +31,81 @@ resource blobs 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
     isVersioningEnabled: true
   }
 }
-resource curated 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource files 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   parent: blobs
-  name: 'curated'
+  name: 'operations'
   properties: { publicAccess: 'None' }
 }
-resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${prefix}-api-reader'
+resource queues 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' = {
+  parent: storage
+  name: 'default'
+  properties: {}
+}
+resource jobs 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = {
+  parent: queues
+  name: 'file-jobs'
+  properties: {}
+}
+resource failed 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = {
+  parent: queues
+  name: 'failed-jobs'
+  properties: {}
+}
+resource identities 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = [for role in ['portal', 'worker']: {
+  name: '${prefix}-${role}'
   location: location
   tags: tags
-}
-resource jobIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${prefix}-pipeline-writer'
-  location: location
-  tags: tags
-}
-resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = if (!empty(registryName)) {
+}]
+resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: registryName
 }
-resource apiPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(registryName)) {
-  name: guid(registry!.id, apiIdentity.id, 'acr-pull')
-  scope: registry!
+resource pull 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, 2): {
+  name: guid(registry.id, identities[i].id, 'pull')
+  scope: registry
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: apiIdentity.properties.principalId
+    principalId: identities[i].properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
+resource blobAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, 2): {
+  name: guid(files.id, identities[i].id, 'blob-contributor')
+  scope: files
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    principalId: identities[i].properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
+resource queueSender 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(jobs.id, identities[0].id, 'sender')
+  scope: jobs
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'c6a89b2d-59bc-44d0-9896-0f6e12d7b80a')
+    principalId: identities[0].properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
-resource jobPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(registryName)) {
-  name: guid(registry!.id, jobIdentity.id, 'acr-pull')
-  scope: registry!
+resource queueProcessor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(jobs.id, identities[1].id, 'processor')
+  scope: jobs
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: jobIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '974c5e8b-45b9-4653-ba55-5f855dd0fb88')
+    principalId: identities[1].properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
-resource readRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(curated.id, apiIdentity.id, 'reader')
-  scope: curated
+resource deadSender 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(failed.id, identities[1].id, 'sender')
+  scope: failed
   properties: {
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
-    )
-    principalId: apiIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-resource writeRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(curated.id, jobIdentity.id, 'writer')
-  scope: curated
-  properties: {
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-    )
-    principalId: jobIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'c6a89b2d-59bc-44d0-9896-0f6e12d7b80a')
+    principalId: identities[1].properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: '${prefix}-logs-${suffix}'
+  name: '${prefix}-logs'
   location: location
   tags: tags
   properties: {
@@ -108,114 +114,95 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     workspaceCapping: { dailyQuotaGb: json('0.1') }
   }
 }
-resource insights 'Microsoft.Insights/components@2020-02-02' = {
-  name: '${prefix}-insights'
-  location: location
-  kind: 'web'
-  tags: tags
-  properties: { Application_Type: 'web', WorkspaceResourceId: logs.id }
-}
-resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
   name: '${prefix}-environment'
   location: location
   tags: tags
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logs.properties.customerId
-        sharedKey: logs.listKeys().primarySharedKey
-      }
+      logAnalyticsConfiguration: { customerId: logs.properties.customerId, sharedKey: logs.listKeys().primarySharedKey }
     }
     workloadProfiles: [{ name: 'Consumption', workloadProfileType: 'Consumption' }]
   }
 }
-var commonEnv = [
-  { name: 'AZURE_STORAGE_ACCOUNT_URL', value: storage.properties.primaryEndpoints.blob }
-  { name: 'TELECOM_CONTAINER', value: curated.name }
-  { name: 'TELECOM_DATA_DIR', value: '/tmp/telecom-data' }
-  { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights.properties.ConnectionString }
-]
-resource api 'Microsoft.App/containerApps@2024-03-01' = if (deployApi) {
-  name: '${prefix}-api'
+resource portal 'Microsoft.App/containerApps@2025-01-01' = {
+  name: '${prefix}-portal'
   location: location
   tags: tags
-  identity: { type: 'UserAssigned', userAssignedIdentities: { '${apiIdentity.id}': {} } }
+  identity: { type: 'UserAssigned', userAssignedIdentities: { '${identities[0].id}': {} } }
   properties: {
     managedEnvironmentId: environment.id
     workloadProfileName: 'Consumption'
     configuration: {
       activeRevisionsMode: 'Single'
-      registries: empty(registryName) ? [] : [{ server: registry!.properties.loginServer, identity: apiIdentity.id }]
+      registries: [{ server: registry.properties.loginServer, identity: identities[0].id }]
       ingress: { external: true, targetPort: 8000, transport: 'auto', allowInsecure: false }
     }
     template: {
-      containers: [
-        {
-          name: 'api'
-          image: image
-          env: concat(commonEnv, [{ name: 'AZURE_CLIENT_ID', value: apiIdentity.properties.clientId }])
-          resources: { cpu: json('0.5'), memory: '1Gi' }
-          probes: [
-            {
-              type: 'Liveness'
-              httpGet: { path: '/health/live', port: 8000 }
-              initialDelaySeconds: 10
-              periodSeconds: 30
-            }
-            {
-              type: 'Readiness'
-              httpGet: { path: '/health/ready', port: 8000 }
-              initialDelaySeconds: 10
-              periodSeconds: 30
-              timeoutSeconds: 15
-            }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 0
-        maxReplicas: 2
-        rules: [{ name: 'http', http: { metadata: { concurrentRequests: '20' } } }]
-      }
+      containers: [{
+        name: 'portal'
+        image: image
+        resources: { cpu: json('0.25'), memory: '0.5Gi' }
+        env: [
+          { name: 'OPERATIONS_STORAGE_ACCOUNT', value: storage.name }
+          { name: 'AZURE_CLIENT_ID', value: identities[0].properties.clientId }
+        ]
+        probes: [
+          { type: 'Liveness', httpGet: { path: '/health/live', port: 8000 }, initialDelaySeconds: 15, periodSeconds: 30 }
+          { type: 'Readiness', httpGet: { path: '/health/ready', port: 8000 }, initialDelaySeconds: 15, periodSeconds: 30, timeoutSeconds: 10 }
+        ]
+      }]
+      scale: { minReplicas: 0, maxReplicas: 1, rules: [{ name: 'http', http: { metadata: { concurrentRequests: '10' } } }] }
     }
   }
-  dependsOn: [readRole, apiPullRole]
+  dependsOn: [pull, blobAccess, queueSender]
 }
-resource pipeline 'Microsoft.App/jobs@2024-03-01' = {
-  name: '${prefix}-pipeline'
+resource worker 'Microsoft.App/jobs@2025-01-01' = {
+  name: '${prefix}-processor'
   location: location
   tags: tags
-  identity: { type: 'UserAssigned', userAssignedIdentities: { '${jobIdentity.id}': {} } }
+  identity: { type: 'UserAssigned', userAssignedIdentities: { '${identities[1].id}': {} } }
   properties: {
     environmentId: environment.id
     workloadProfileName: 'Consumption'
     configuration: {
-      registries: empty(registryName) ? [] : [{ server: registry!.properties.loginServer, identity: jobIdentity.id }]
-      triggerType: enableSchedule ? 'Schedule' : 'Manual'
-      replicaTimeout: 1800
+      triggerType: 'Event'
+      replicaTimeout: 180
       replicaRetryLimit: 1
-      manualTriggerConfig: enableSchedule ? null : { parallelism: 1, replicaCompletionCount: 1 }
-      scheduleTriggerConfig: enableSchedule
-        ? { cronExpression: '0 8 2 */3 *', parallelism: 1, replicaCompletionCount: 1 }
-        : null
+      registries: [{ server: registry.properties.loginServer, identity: identities[1].id }]
+      eventTriggerConfig: {
+        parallelism: 1
+        replicaCompletionCount: 1
+        scale: {
+          minExecutions: 0
+          maxExecutions: 1
+          pollingInterval: 60
+          rules: [{
+            name: 'incoming-files'
+            type: 'azure-queue'
+            identity: identities[1].id
+            metadata: { accountName: storage.name, queueName: jobs.name, queueLength: '1' }
+          }]
+        }
+      }
     }
     template: {
-      containers: [
-        {
-          name: 'pipeline'
-          image: image
-          command: ['python', '-m', 'telecom_cloud.pipeline', '--publish']
-          env: concat(commonEnv, [{ name: 'AZURE_CLIENT_ID', value: jobIdentity.properties.clientId }])
-          resources: { cpu: 1, memory: '2Gi' }
-        }
-      ]
+      containers: [{
+        name: 'processor'
+        image: image
+        command: ['python', '-m', 'operations_cloud.worker']
+        resources: { cpu: json('0.25'), memory: '0.5Gi' }
+        env: [
+          { name: 'OPERATIONS_STORAGE_ACCOUNT', value: storage.name }
+          { name: 'AZURE_CLIENT_ID', value: identities[1].properties.clientId }
+        ]
+      }]
     }
   }
-  dependsOn: [writeRole, jobPullRole]
+  dependsOn: [pull, blobAccess, queueProcessor, deadSender]
 }
-output appUrl string = deployApi ? 'https://${api!.properties.configuration.ingress.fqdn}' : ''
-output pipelineName string = pipeline.name
+output appUrl string = 'https://${portal.properties.configuration.ingress.fqdn}'
 output storageAccountName string = storage.name
-output readerIdentity string = apiIdentity.name
-output writerIdentity string = jobIdentity.name
+output processorName string = worker.name
+output logWorkspace string = logs.name

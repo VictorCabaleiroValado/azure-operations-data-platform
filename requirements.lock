@@ -62,3 +62,4 @@ typing_extensions==4.16.0
 urllib3==2.8.0
 uvicorn==0.54.0
 wrapt==2.5.0
+azure-storage-queue==12.15.0

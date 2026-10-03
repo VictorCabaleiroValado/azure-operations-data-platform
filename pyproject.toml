@@ -3,17 +3,17 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "azure-telecom-cloud"
-version = "0.1.0"
-description = "Reproducible Azure data platform for observed connectivity performance"
+name = "azure-operations-data-platform"
+version = "1.0.0"
+description = "Azure data integration and operations for a fictional electronics distributor"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "duckdb>=1.2,<2", "azure-identity>=1.19,<2", "azure-storage-blob>=12.24,<13", "azure-monitor-opentelemetry>=1.6,<2", "opentelemetry-instrumentation-fastapi>=0.50b0,<1"]
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "duckdb>=1.2,<2", "azure-identity>=1.19,<2", "azure-storage-blob>=12.24,<13", "azure-storage-queue>=12.15,<13", "azure-monitor-opentelemetry>=1.6,<2", "opentelemetry-instrumentation-fastapi>=0.50b0,<1"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.9,<1"]
 
 [project.scripts]
-telecom-pipeline = "telecom_cloud.pipeline:main"
+operations-worker = "operations_cloud.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -25,12 +25,12 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
-          tags: ${{ vars.AZURE_REGISTRY }}.azurecr.io/telecom:${{ github.sha }}
+          tags: ${{ vars.AZURE_REGISTRY }}.azurecr.io/operations:${{ github.sha }}
           provenance: true
           sbom: true
       - name: Record immutable image
         env:
-          IMAGE: ${{ vars.AZURE_REGISTRY }}.azurecr.io/telecom@${{ steps.build.outputs.digest }}
+          IMAGE: ${{ vars.AZURE_REGISTRY }}.azurecr.io/operations@${{ steps.build.outputs.digest }}
         run: python -c 'import json,os; json.dump({"image":os.environ["IMAGE"]},open("cloud-image.json","w"))'
       - uses: actions/upload-artifact@v4
         with:

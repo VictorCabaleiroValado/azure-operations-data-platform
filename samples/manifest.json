@@ -1,0 +1,100 @@
+[
+  {
+    "file": "nexo-centro.csv",
+    "supplier": "nexo",
+    "warehouse": "centro",
+    "kind": "valid",
+    "label": "Nexo Electrónica · Madrid Centro"
+  },
+  {
+    "file": "iberia-centro.csv",
+    "supplier": "iberia",
+    "warehouse": "centro",
+    "kind": "valid",
+    "label": "Iberia Componentes · Madrid Centro"
+  },
+  {
+    "file": "circuito-centro.csv",
+    "supplier": "circuito",
+    "warehouse": "centro",
+    "kind": "valid",
+    "label": "Circuito Digital · Madrid Centro"
+  },
+  {
+    "file": "nexo-leganes.csv",
+    "supplier": "nexo",
+    "warehouse": "leganes",
+    "kind": "valid",
+    "label": "Nexo Electrónica · Leganés"
+  },
+  {
+    "file": "iberia-leganes.csv",
+    "supplier": "iberia",
+    "warehouse": "leganes",
+    "kind": "valid",
+    "label": "Iberia Componentes · Leganés"
+  },
+  {
+    "file": "circuito-leganes.csv",
+    "supplier": "circuito",
+    "warehouse": "leganes",
+    "kind": "valid",
+    "label": "Circuito Digital · Leganés"
+  },
+  {
+    "file": "nexo-sanchinarro.csv",
+    "supplier": "nexo",
+    "warehouse": "sanchinarro",
+    "kind": "valid",
+    "label": "Nexo Electrónica · Sanchinarro"
+  },
+  {
+    "file": "iberia-sanchinarro.csv",
+    "supplier": "iberia",
+    "warehouse": "sanchinarro",
+    "kind": "valid",
+    "label": "Iberia Componentes · Sanchinarro"
+  },
+  {
+    "file": "circuito-sanchinarro.csv",
+    "supplier": "circuito",
+    "warehouse": "sanchinarro",
+    "kind": "valid",
+    "label": "Circuito Digital · Sanchinarro"
+  },
+  {
+    "file": "nexo-pedrezuela.csv",
+    "supplier": "nexo",
+    "warehouse": "pedrezuela",
+    "kind": "valid",
+    "label": "Nexo Electrónica · Pedrezuela"
+  },
+  {
+    "file": "iberia-pedrezuela.csv",
+    "supplier": "iberia",
+    "warehouse": "pedrezuela",
+    "kind": "valid",
+    "label": "Iberia Componentes · Pedrezuela"
+  },
+  {
+    "file": "circuito-pedrezuela.csv",
+    "supplier": "circuito",
+    "warehouse": "pedrezuela",
+    "kind": "valid",
+    "label": "Circuito Digital · Pedrezuela"
+  },
+  {
+    "file": "nexo-centro-errors.csv",
+    "supplier": "nexo",
+    "warehouse": "centro",
+    "kind": "invalid",
+    "label": "Ejemplo con errores · Centro"
+  },
+  {
+    "file": "nexo-centro-corrected.csv",
+    "supplier": "nexo",
+    "warehouse": "centro",
+    "kind": "correction",
+    "label": "Corrección de existencias · Centro"
+  }
+]

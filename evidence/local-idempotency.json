@@ -1,8 +1,0 @@
-{
-  "input_release": "aee0b1c4-f32e-46a3-bd3c-7e242e17b541",
-  "source_rows": 7403,
-  "first_run": "cf210cfb-757d-4033-bd1b-c2fc885b7e49",
-  "second_run": "38de654b-8e05-4f93-9a6a-8af173bb2c30",
-  "repeat_changed_partitions": 0,
-  "mode": "replay of real downloaded observations; no second network fetch"
-}

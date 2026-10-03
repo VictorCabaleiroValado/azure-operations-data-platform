@@ -1,56 +1,41 @@
-# Deployment and operations runbook
+# Runbook
 
-## Before deployment
+## Local
 
-Use a personally authorized subscription or an explicitly approved institutional sandbox. Being able to sign in to a university tenant is not sufficient authorization to use departmental resources. Confirm subscription, region availability, spending protection and a monthly consumption budget before provisioning. Keep identifiers and credentials out of public evidence.
+Use the README commands. `seed_operations.py` creates disclosed synthetic examples and processes twelve valid snapshots plus one rejected file. Restarting the local API recovers queued/processing runs through its local loop. Data lives under ignored `data/operations/`.
 
-The deployment identity needs resource deployment permissions in a dedicated resource group and permission to assign the two scoped data roles. Runtime identities have only container-scoped reader/writer permissions. Configure GitHub's `azure-portfolio` environment with required reviewers and federated OIDC trust restricted to that environment/repository. Put client, tenant, subscription and resource-group identifiers in environment variables; no client secret is needed.
+## Azure deployment
 
-## Build and bootstrap
+Use Azure for Students in the dedicated project resource group. Keep its spending limit enabled. Resource names may retain `telecom` where an existing registry/group is reused; those are historical names, not a second running application.
 
-An alternative to a public GHCR image is an Azure Container Registry in the dedicated project resource group. Build there with `az acr build`, keep admin credentials disabled, pin the resulting image digest and pass `registryName` to `infra/main.bicep`. The template grants each runtime identity AcrPull only on that registry. Registry/task usage must be included in cost checks. The registry is an external prerequisite, not created by the main template.
+1. Run local tests and compile Bicep.
+2. Run **Build Azure image** on main. Its federated identity has AcrPush only on the project ACR. Read the immutable digest from its `azure-image` artifact or ACR.
+3. Deploy `infra/main.bicep` using the owner's authenticated Azure CLI:
 
-1. Run local tests and compile both Bicep files.
-2. Run the `Build image` workflow after repository publication. Make that one image package public for credential-free pulls; scan it and use the returned immutable digest. Do not publish unrelated images or credentials.
-3. Create a dedicated project resource group in the approved subscription. Check resource-provider registration and regional quotas.
-4. Deploy `infra/budget.bicep` using the approved amount and notification email. A budget alert is not a hard spending cap; it may lag consumption.
-5. Run the manual `Deploy Azure` workflow. It first deploys storage, identities and the job with `deployApi=false`, starts and waits for ingestion, then deploys the API with `deployApi=true`. This avoids a readiness deadlock before the first snapshot exists.
-6. Verify `/health/ready`, metadata and a filtered query against the cloud endpoint. Inspect the actual revision image digest, runtime identity and Blob role assignments. Confirm that the API identity cannot upload or delete blobs.
-7. Record cloud evidence separately from local results. A successful Bicep compile or ARM provisioning does not prove successful ingestion or identity enforcement.
+```bash
+az deployment group what-if --resource-group rg-azure-telecom-portfolio \
+  --template-file infra/main.bicep --parameters image=REGISTRY.azurecr.io/operations@sha256:DIGEST
+az deployment group create --resource-group rg-azure-telecom-portfolio \
+  --template-file infra/main.bicep --parameters image=REGISTRY.azurecr.io/operations@sha256:DIGEST
+```
 
-The initial workflow expects the default `telecom` prefix. When using another prefix, update the job name consistently. Scheduled execution is disabled. Enabling a schedule does not discover new quarters: update the explicit configuration after checking source availability.
+CLI commands shown assume `az` is installed and logged into the correct student subscription. Do not place tokens or connection strings in the repository.
 
-## Required live acceptance checks
+4. Verify `/health/ready` and `/api/catalog` (`runtime=azure`). Submit the bundled samples through the API. The queue starts a processing job; query its execution status and `/api/runs/ID` until terminal.
+5. Test an invalid CSV and a duplicate. Check that invalid input leaves inventory unchanged and duplicate upload returns the same ID. Confirm logs and scoped access in Azure.
 
-- Container image builds for linux/amd64 and runs as UID 10001.
-- First cloud job succeeds with real sources; remote pointer and database checksum agree.
-- Second run produces no extra records; concurrent job writers cannot publish simultaneously.
-- Deliberately invalid input leaves the last valid remote pointer intact.
-- API read identity can retrieve snapshots but is denied write/delete operations.
-- Application Insights receives a real request trace; Log Analytics receives job completion/failure records.
-- Cloud readiness and selected metrics agree with local source expectations.
-- Cold/warm latency, one job's duration and actual Cost Management usage are recorded.
+## Failed processing
 
-## Refresh and recovery
+Inspect Container Apps Job executions and Log Analytics. Do not blindly resubmit a rejected CSV: correct it first. After fixing a technical error, run `retry(store, run_id)` using an authorized operator identity, or resubmit a still-pending file. Public manual retry is disabled. The worker moves persistent technical failures to the dedicated failed queue after five deliveries.
 
-For a normal refresh, run the job manually and inspect its execution status. Local mode: `python -m telecom_cloud.pipeline`. Existing unchanged partitions skip SQL rewrites, but source Parquet is still re-read to detect revisions.
+## Rollback
 
-If validation fails, inspect the structured `pipeline_failed` log and the exception. Fix the source/configuration issue, then retry. Never suppress the validation to force publication.
+Redeploy the previous verified image digest using the same Bicep. Input files and results remain in Blob Storage. Do not delete the storage account during application rollback. An older stock date cannot supersede a newer date; publish a corrected same-date snapshot to correct business data.
 
-For cloud rollback, stop new job starts, acquire the writer lease, select a previously successful immutable release and verify its database SHA-256. Replace `current.json` with that release's manifest, then release the lease. The API refreshes within its 60-second cache window. Verify metrics after rollback. Do not delete the last good release.
+## Static copy
 
-If a writer is interrupted, its renewable 60-second lease expires. A second run can then acquire it. If the app cannot download a release, it returns a 503 rather than inventing values or silently serving a different dataset.
+`python scripts/export_operations.py` exports the current local data by default. The snapshot mode visibly disables uploads. To publish cloud evidence, export the verified API state with the catalog and the real app URL; never relabel local runs as Azure. Run **Publish free demo** after committing `dist/`.
 
-## Cost controls and teardown
+## Shutdown
 
-Keep minReplicas=0, maxReplicas=2, manual job triggers and bounded source selections. Log ingestion has a configured daily cap; caps and budget notifications can have latency and are not a complete spending guarantee. Keep 30-day log retention. Avoid paid private networking or additional databases until justified.
-
-After an authorized demo period, retain code, the static snapshot and verification records. Preview the exact resource group contents before deleting the dedicated project group. Group deletion is destructive and must be a deliberate user action; this repository does not run it automatically.
-
-## Troubleshooting
-
-- **No data / 503:** check job execution, remote `current.json`, identity role propagation and storage access.
-- **Image pull failure:** verify the image package is public and the digest exists for linux/amd64.
-- **403 on storage:** inspect the correct user-assigned identity's client ID and container-scoped role. Do not enable account keys as a workaround.
-- **Source/extension access failure:** verify public HTTPS access to Ookla and DuckDB extension hosting. Download failure must not publish partial data.
-- **Azure Policy/region rejection:** select an allowed region or request an authorized sandbox; do not weaken institutional policy.
+Review actual resource costs in the portal. To stop processing, remove the event trigger or stop/delete the project job after confirming pending messages. Delete the dedicated portfolio resource group only when the owner wants to retire the deployment and after exporting evidence; this deletes storage, logs and the registry. GitHub Pages remains independent. Nothing here enables an unattended cleanup schedule.

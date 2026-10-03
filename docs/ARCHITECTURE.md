@@ -1,39 +1,27 @@
 # Architecture decisions
 
-## Scope and acceptance
+## Bounded, event-driven data integration
 
-Deliver a complete local data product, a reproducible cloud deployment definition and inspectable verification evidence. Azure deployment is a distinct acceptance gate requiring an authorized subscription and budget. Initial geography consists of explicitly labelled study rectangles around Madrid and Fayetteville. Initial historical coverage is fixed/mobile Q3–Q4 2024.
+One Container App serves the portal and API; one event-driven Container Apps Job processes queued files. Azure Blob Storage holds immutable originals and normalized results plus mutable run records. Queue Storage provides at-least-once delivery. Both compute components scale to zero. No calendar schedule is enabled.
 
-## ADR-001: Blob-backed immutable SQL snapshots
+Container Apps Jobs replace the initially discussed Functions option: the same Python image can run the web service and a short-lived job, reducing duplicated packaging. [Microsoft documents this queue-driven pattern](https://learn.microsoft.com/en-us/azure/container-apps/tutorial-event-driven-jobs).
 
-The API serves small, read-heavy analytical datasets. The job writes a new SQLite database locally, validates it, uploads it under a unique run ID, then publishes `current.json`. The API downloads a release once per instance, verifies its SHA-256 and opens read-only SQL connections. SQL queries use bound parameters. Each replica has an independent, disposable cache.
+## State and recovery
 
-Benefits: simple rollback, no shared writable database files, low resource footprint, offline reproduction and clear data lineage. Limits: full snapshot downloads, bounded dataset size and up to 60 seconds of per-instance refresh delay. This is not suitable for high-write workloads or unbounded data. Azure SQL becomes justified if transactional multi-writer access or larger concurrent query workloads are required.
+Upload original first, then create the run record atomically if absent, then enqueue its ID. A repeat upload repairs an interrupted enqueue for non-terminal work. A per-run renewable 60-second blob lease excludes concurrent processors; local mode uses `flock`. A worker writes the normalized result before marking the run complete. The query layer includes only complete runs. Validation failures are terminal rejections; transient failures remain retryable through message visibility. After five failed deliveries, the run is marked failed and its ID goes to `failed-jobs`. The operator can requeue it after fixing the cause.
 
-## ADR-002: Separate runtime identities
+No distributed transaction spans upload and queue submission. If a client disconnects before enqueue, repeat the upload or use the recovery command; this is an explicit limitation. A production system would use an outbox or a reconciliation process. Blob leases reduce concurrent publication risk but do not replace a transactional database for high-volume inventory mutations.
 
-The job receives Storage Blob Data Contributor on the **curated container**, not the subscription. The API receives Storage Blob Data Reader on that same container. Shared storage keys and anonymous blob access are disabled. GitHub authenticates deployments through OIDC, avoiding a stored client secret.
+## Storage and SQL
 
-The initial storage endpoint is internet-routable but requires Entra authorization. Private endpoints/VNet integration are not implemented. The API is public and serves only licensed public measurements; it has no public ingestion or mutation route. Cost exposure from public requests remains possible even with replica caps.
+This portfolio workload is bounded by fourteen approved fixture files and four warehouses. Blob listing and in-memory DuckDB SQL keep persistent infrastructure small. They are not an architecture for unbounded inventory traffic. For a larger service, introduce indexed run metadata and a relational store with transactional updates. Azure SQL/Data Factory are not deployed or claimed.
 
-## ADR-003: Container Apps consumption
+## Identity and public access
 
-The application can scale from zero to two replicas; the processing job runs manually by default. No AKS cluster is needed for this bounded workload. A public GHCR image, preferably pinned by digest, avoids an always-on private registry. Image publication is a separate explicit workflow. Cold starts and extension installation affect initial latency and require cloud measurement.
+The API and job have separate user-assigned managed identities. Both receive Blob Data Contributor on the single project container because each writes run documents. The API can send messages only to the input queue. The worker can consume that queue and send failed IDs to the dead-letter queue. Both can pull the private project image. Shared storage account keys and anonymous blob access are disabled.
 
-## ADR-004: Atomic publication and failure recovery
+The public API exposes only synthetic fixtures. It rejects arbitrary uploads and manual retry requests. Local mode permits own files up to the size limit. This demo is not a multi-tenant supplier portal: production operation requires user authentication, authorization, malware policy, retention and load testing appropriate to its data.
 
-A failed quality check never replaces the local release pointer. Cloud writers use a renewable Blob lease. They upload immutable database and manifest objects before changing the remote pointer. A checksum detects a corrupted download. Old releases support rollback.
+## Map and presentation
 
-A cloud publication failure may leave an unreferenced immutable object; it does not make that object the active release. Retention cleanup is intentionally manual until a recovery window and retention budget are agreed. Local concurrent writers are serialized using a filesystem lock. Cloud lease behavior has unit-test coverage with fakes and requires a live concurrency exercise before a production claim.
-
-## ADR-005: Honest data interpretation
-
-Weighted regional speeds describe tests. Matched-tile changes control for changing tile coverage but cannot control for changing test participants or devices. No confidence interval is fabricated from aggregated source means. Absolute review thresholds are an exploratory user-facing rule and are not a service-level agreement.
-
-## Roadmap beyond initial scope
-
-- Azure SQL backend with measured justification and query benchmarks.
-- VNet/private endpoints when network isolation is required.
-- Queue-based arrivals, dead-letter processing and event deduplication when source arrival becomes event-driven.
-- Load testing, cost-per-refresh and recovery-time evidence after deployment.
-- Additional periods selected and validated explicitly; no automatic inference of latest availability.
+Leaflet 1.9.4 is vendored with its licence. OpenStreetMap tiles are requested by the visitor's browser for its visible viewport, with attribution, normal caching and Referer headers. No bulk tile downloads. A button list provides equivalent warehouse selection if map tiles are unavailable. Hosting and tile providers can change independently.

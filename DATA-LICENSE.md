@@ -1,12 +1,9 @@
-# Data license and attribution
+# Data and map licences
 
-Files in `dist/assets/demo.json`, derived data snapshots and any exported CSV containing these observations are derived from Speedtest by Ookla Global Fixed and Mobile Network Performance Maps.
+All current business data was generated specifically for this educational project and is released under MIT with the original code. Company, suppliers, product labels, quantities and warehouse placements are fictional. Coordinates are approximate demonstration points, not claims about actual facilities.
 
-Source: https://github.com/teamookla/ookla-open-data and https://registry.opendata.aws/speedtest-global-performance/.
-Accessed: 3 October 2026. Observation periods: Q3–Q4 2024.
-Modifications: geographic centroid filtering into Madrid/Fayetteville study rectangles, normalized field names and units for display, SQL storage, weighted aggregation and matched-tile comparison.
+Map data: © OpenStreetMap contributors, ODbL. Visible attribution links to https://www.openstreetmap.org/copyright. Browser tile usage follows https://operations.osmfoundation.org/policies/tiles/; no prefetch or offline tile archive is provided.
 
-License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
-License text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+Leaflet 1.9.4: BSD-2-Clause; see `web/vendor/LEAFLET-LICENSE`.
 
-The MIT license for original project code does not relicense these data. Retain attribution, identify modifications and follow the source license when sharing adaptations. This is an independent educational project; no affiliation or endorsement is implied.
+The old telecom edition at tag `telecom-v1` uses Ookla-derived data under CC BY-NC-SA 4.0 as documented in that historical version. Its data is not used in the current operations app.

@@ -16,17 +16,20 @@ jobs:
       - run: pip install -r requirements.lock && pip install --no-deps -e .
       - run: ruff check src tests scripts
       - run: pytest -q
-      - run: python scripts/bootstrap_demo.py && python scripts/verify_frontend.py
-      - run: node scripts/check_csv.mjs
-      - run: docker build -t telecom:test .
-      - name: Container liveness
+      - run: python scripts/seed_operations.py && python scripts/export_operations.py
+      - run: node scripts/check_operations.mjs
+      - run: docker build -t operations:test .
+      - name: Container health and API
         run: |
-          docker run -d --name telecom-test -p 8000:8000 telecom:test
+          docker run -d --name operations-test -p 8000:8000 operations:test
           for i in $(seq 1 30); do
-            if curl --fail http://localhost:8000/health/live; then exit 0; fi
+            if curl --fail http://localhost:8000/health/ready; then
+              curl --fail http://localhost:8000/api/catalog
+              exit 0
+            fi
             sleep 2
           done
-          docker logs telecom-test
+          docker logs operations-test
           exit 1
   infrastructure:
     runs-on: ubuntu-latest
