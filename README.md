@@ -4,6 +4,8 @@ An Azure portfolio project by **Victor Manuel Cabaleiro Valado**: receive suppli
 
 The business is fictional. All suppliers, products, quantities and warehouse locations are synthetic demonstration data. The map uses real OpenStreetMap cartography; markers do not identify real company premises.
 
+[Live Azure application](https://operations-web.icystone-6e204dad.westus2.azurecontainerapps.io) · [Free read-only demo](https://victorcabaleirovalado.github.io/azure-operations-data-platform/)
+
 ## Try the workflow
 
 1. Select a warehouse on the map. Its inventory and processing history become the active view.

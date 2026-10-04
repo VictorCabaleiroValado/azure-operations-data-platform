@@ -6,9 +6,9 @@ Azure Operations Data Platform — Electronics Distribution
 
 ## What the implementation demonstrates
 
-Built a Python platform that validates supplier inventory files, rejects invalid snapshots, prevents duplicate processing, and consolidates warehouse stock through SQL. Designed an Azure deployment using Container Apps, an event-driven processing job, Blob/Queue Storage, managed identities, Bicep and execution logs. The Spanish portal includes warehouse selection on an interactive Madrid map, upload results and inventory export.
+Built a Python platform that validates supplier inventory files, rejects invalid snapshots, prevents duplicate processing, and consolidates warehouse stock through SQL. Deployed and verified the workflow on Azure for Students using Container Apps, an event-driven processing job, Blob/Queue Storage, managed identities, Bicep and execution logs. The Spanish portal includes warehouse selection on an interactive Madrid map, upload results and inventory export.
 
-Use “deployed and verified on Azure” only after VERIFICATION.md records the successful cloud acceptance checks. Do not claim Azure SQL, Data Factory, production clients, savings, enterprise scale or professional cloud tenure from this project.
+VERIFICATION.md records successful cloud acceptance checks and links the supporting evidence. Do not claim Azure SQL, Data Factory, production clients, savings, enterprise scale or professional cloud tenure from this project.
 
 ## Short interview explanation
 

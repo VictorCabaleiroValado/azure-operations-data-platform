@@ -114,11 +114,12 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     workspaceCapping: { dailyQuotaGb: json('0.1') }
   }
 }
-resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
-  name: '${prefix}-environment'
+resource environment 'Microsoft.App/managedEnvironments@2026-07-01' = {
+  name: '${prefix}-standard-environment'
   location: location
   tags: tags
   properties: {
+    environmentMode: 'WorkloadProfiles'
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: { customerId: logs.properties.customerId, sharedKey: logs.listKeys().primarySharedKey }
@@ -127,7 +128,7 @@ resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
   }
 }
 resource portal 'Microsoft.App/containerApps@2025-01-01' = {
-  name: '${prefix}-portal'
+  name: '${prefix}-web'
   location: location
   tags: tags
   identity: { type: 'UserAssigned', userAssignedIdentities: { '${identities[0].id}': {} } }

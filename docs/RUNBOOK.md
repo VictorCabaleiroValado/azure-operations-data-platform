@@ -10,7 +10,7 @@ Use Azure for Students in the dedicated project resource group. Keep its spendin
 
 1. Run local tests and compile Bicep.
 2. Run **Build Azure image** on main. Its federated identity has AcrPush only on the project ACR. Read the immutable digest from its `azure-image` artifact or ACR.
-3. Deploy `infra/main.bicep` using the owner's authenticated Azure CLI:
+3. The environment explicitly uses `environmentMode: WorkloadProfiles`. Express environments cannot run Container Apps Jobs. The 2026-07-01 resource API exposes this setting; older Bicep type catalogs can emit BCP081, so ARM deployment validation is also required. Deploy `infra/main.bicep` using the owner's authenticated Azure CLI:
 
 ```bash
 az deployment group what-if --resource-group rg-azure-telecom-portfolio \
@@ -22,7 +22,7 @@ az deployment group create --resource-group rg-azure-telecom-portfolio \
 CLI commands shown assume `az` is installed and logged into the correct student subscription. Do not place tokens or connection strings in the repository.
 
 4. Verify `/health/ready` and `/api/catalog` (`runtime=azure`). Submit the bundled samples through the API. The queue starts a processing job; query its execution status and `/api/runs/ID` until terminal.
-5. Test an invalid CSV and a duplicate. Check that invalid input leaves inventory unchanged and duplicate upload returns the same ID. Confirm logs and scoped access in Azure.
+5. Run `python scripts/verify_cloud.py https://YOUR-APP.azurecontainerapps.io` to perform the bounded acceptance sequence and export its evidence. It uploads the bundled fictional fixtures, waits for automatic jobs and verifies rejection, correction and duplicate behavior. Test an invalid CSV and a duplicate. Check that invalid input leaves inventory unchanged and duplicate upload returns the same ID. Confirm logs and scoped access in Azure.
 
 ## Failed processing
 
@@ -34,7 +34,7 @@ Redeploy the previous verified image digest using the same Bicep. Input files an
 
 ## Static copy
 
-`python scripts/export_operations.py` exports the current local data by default. The snapshot mode visibly disables uploads. To publish cloud evidence, export the verified API state with the catalog and the real app URL; never relabel local runs as Azure. Run **Publish free demo** after committing `dist/`.
+`python scripts/export_operations.py` exports the current local data by default. The snapshot mode visibly disables uploads. To publish cloud evidence, run `python scripts/export_operations.py --cloud-url https://YOUR-APP.azurecontainerapps.io`; never relabel local runs as Azure. Run **Publish free demo** after committing `dist/`.
 
 ## Shutdown
 

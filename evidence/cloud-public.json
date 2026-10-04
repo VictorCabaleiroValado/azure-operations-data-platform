@@ -1,0 +1,18 @@
+{
+  "app_url": "https://operations-web.icystone-6e204dad.westus2.azurecontainerapps.io",
+  "verified_at": "2026-10-04T00:02:04Z",
+  "health": "ready",
+  "runtime": "azure",
+  "runs": 14,
+  "completed": 13,
+  "rejected": 1,
+  "inventory_rows": 48,
+  "checks": [
+    "twelve_supplier_warehouse_snapshots",
+    "invalid_file_preserves_inventory",
+    "correction_replaces_snapshot",
+    "duplicate_returns_same_id"
+  ],
+  "correction_run": "de5e806e4ff9ecbb2a4d0ca9bc37bf32c2020b0383ad299f4f78e2bc0cee5056",
+  "rejected_run": "0857a4791e31917da4b00e9d901dd991c95211cdbcae709a10d7d15378314aed"
+}

@@ -1,0 +1,42 @@
+{
+  "verified_at": "2026-10-04T00:02:04Z",
+  "anonymous_original_blob_http": 409,
+  "unapproved_upload_http": 403,
+  "allow_shared_key_access": false,
+  "allow_blob_public_access": false,
+  "minimum_tls": "TLS1_2",
+  "role_assignments": [
+    {
+      "role": "AcrPush",
+      "scope": "microsoft.containerregistry/registries/telecomvc53728"
+    },
+    {
+      "role": "AcrPull",
+      "scope": "microsoft.containerregistry/registries/telecomvc53728"
+    },
+    {
+      "role": "AcrPull",
+      "scope": "microsoft.containerregistry/registries/telecomvc53728"
+    },
+    {
+      "role": "Storage Blob Data Contributor",
+      "scope": "microsoft.storage/storageaccounts/opsidwvnj2cywlny/blobservices/default/containers/operations"
+    },
+    {
+      "role": "Storage Blob Data Contributor",
+      "scope": "microsoft.storage/storageaccounts/opsidwvnj2cywlny/blobservices/default/containers/operations"
+    },
+    {
+      "role": "Storage Queue Data Message Sender",
+      "scope": "microsoft.storage/storageaccounts/opsidwvnj2cywlny/queueservices/default/queues/file-jobs"
+    },
+    {
+      "role": "Storage Queue Data Contributor",
+      "scope": "microsoft.storage/storageaccounts/opsidwvnj2cywlny/queueservices/default/queues/file-jobs"
+    },
+    {
+      "role": "Storage Queue Data Message Sender",
+      "scope": "microsoft.storage/storageaccounts/opsidwvnj2cywlny/queueservices/default/queues/failed-jobs"
+    }
+  ]
+}

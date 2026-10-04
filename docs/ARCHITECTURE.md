@@ -4,6 +4,8 @@
 
 One Container App serves the portal and API; one event-driven Container Apps Job processes queued files. Azure Blob Storage holds immutable originals and normalized results plus mutable run records. Queue Storage provides at-least-once delivery. Each job processes at most twenty messages, one at a time, to amortize cold starts. Both compute components scale to zero. No calendar schedule is enabled.
 
+The environment explicitly uses Workload Profiles with a Consumption profile. Express environments do not support Jobs; this was verified during deployment and corrected in Bicep.
+
 Container Apps Jobs replace the initially discussed Functions option: the same Python image can run the web service and a short-lived job, reducing duplicated packaging. [Microsoft documents this queue-driven pattern](https://learn.microsoft.com/en-us/azure/container-apps/tutorial-event-driven-jobs).
 
 ## State and recovery
