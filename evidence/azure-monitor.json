@@ -1,0 +1,26 @@
+[
+  {
+    "columns": [
+      {
+        "name": "count_",
+        "type": "long"
+      },
+      {
+        "name": "min_TimeGenerated",
+        "type": "datetime"
+      },
+      {
+        "name": "max_TimeGenerated",
+        "type": "datetime"
+      }
+    ],
+    "name": "PrimaryResult",
+    "rows": [
+      [
+        12,
+        "2026-10-03T23:59:08.1688102Z",
+        "2026-10-03T23:59:10.9773012Z"
+      ]
+    ]
+  }
+]

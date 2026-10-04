@@ -31,6 +31,6 @@ Three queue-triggered job executions succeeded without a manual job start: `oper
 - Storage: shared keys and anonymous blobs disabled; TLS 1.2 minimum. An anonymous request for an existing original blob was blocked with HTTP 409. An unapproved public upload was rejected with HTTP 403.
 - Role assignments were read back from Azure: per-container Blob Data Contributor, queue-specific sender/contributor roles, registry-only AcrPull and registry-only build AcrPush.
 - The failed Express application and environment were removed; durable storage and the working Standard environment remain.
-- Log Analytics is configured; ingestion of the new job events is checked separately from the successful live console-log read.
+- Azure Monitor / Log Analytics ingestion was independently verified: a KQL query returned twelve `file_processed` events for the first batch. [Query result](../evidence/azure-monitor.json). Later events may appear after the normal ingestion delay.
 
 The static demo now contains a snapshot exported from the Azure API and a link to the live portal. It remains explicitly read-only. Data represents a fictional inventory snapshot, not real business activity.
