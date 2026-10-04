@@ -2,7 +2,7 @@
 
 An Azure portfolio project by **Victor Manuel Cabaleiro Valado**: receive supplier inventory files, check them, and publish a consistent view of electronics stock across **Madrid Centro, Leganés, Sanchinarro and Pedrezuela**.
 
-The business is fictional. All suppliers, products, quantities and warehouse locations are synthetic demonstration data. The map uses the OpenFreeMap Positron vector basemap, based on OpenStreetMap; markers do not identify real company premises.
+The business is fictional. All suppliers, products, quantities and warehouse locations are synthetic demonstration data. The map uses the OpenFreeMap Bright vector basemap with optional 3D buildings, based on OpenStreetMap; markers do not identify real company premises.
 
 [Live Azure application](https://operations-web.icystone-6e204dad.westus2.azurecontainerapps.io) · [Free read-only demo](https://victorcabaleirovalado.github.io/azure-operations-data-platform/)
 

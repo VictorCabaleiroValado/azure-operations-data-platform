@@ -6,7 +6,7 @@ const number = (value) => new Intl.NumberFormat('es-ES').format(value);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 const labels = {queued: 'En cola', processing: 'Procesando', completed: 'Completado', rejected: 'Rechazado', failed: 'Fallo técnico'};
 const titles = {overview: 'Operaciones de almacén', inventory: 'Inventario', upload: 'Recepción de archivos', runs: 'Procesamientos', cloud: 'El sistema en Azure'};
-let catalog, data, runtime, map, markers = [], selection = '', activeTab = 'overview', refreshBusy = false;
+let catalog, data, runtime, map, markers = [], selection = '', activeTab = 'overview', refreshBusy = false, map3D = false, mapVectorReady = false;
 
 async function json(url, options) {
   const response = await fetch(url, options);
@@ -64,12 +64,9 @@ function render() {
     const stock = filteredState(data, b.dataset.warehouse);
     b.querySelector('.warehouse-stock').textContent = `${number(stock.units)} uds. · ${stock.references} referencias`;
   });
-  markers.forEach(({marker, warehouse, index}) => {
-    marker.setIcon(markerIcon(warehouse.id, index));
-    marker.getElement()?.setAttribute('aria-label', `Seleccionar ${warehouse.name}`);
-    marker.getElement()?.setAttribute('aria-pressed', String(selection === warehouse.id));
-    marker.setZIndexOffset(selection === warehouse.id ? 1000 : 0);
-    marker.getTooltip()?.getElement()?.classList.toggle('is-selected', selection === warehouse.id);
+  markers.forEach(({element, warehouse}) => {
+    element.classList.toggle('selected', selection === warehouse.id);
+    element.setAttribute('aria-pressed', String(selection === warehouse.id));
   });
   renderInventory();
 }
@@ -79,53 +76,69 @@ function chooseWarehouse(id) {
   $('#warehouse').value = id;
   if (id) { $('#upload-warehouse').value = id; updateSamples(); }
   render();
+  if (map3D && id) focusWarehouse(id);
 }
 
-function markerIcon(id, index) {
-  const building = '<svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M3 10 12 4l9 6v10H3Z M8 20v-7h8v7 M8 16h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
-  return L.divIcon({className: 'warehouse-pin', html: `<span class="warehouse-marker ${selection === id ? 'selected' : ''}">${building}<i>${index + 1}</i></span>`, iconSize: [36, 36], iconAnchor: [18, 18]});
+function focusWarehouse(id) {
+  const warehouse = catalog.warehouses.find((w) => w.id === id) || catalog.warehouses[0];
+  map.easeTo({center: [warehouse.lon, warehouse.lat], zoom: 16, pitch: 55, bearing: -20, duration: 650});
 }
 
 function fitWarehouseMap() {
   if (!map) return;
-  map.fitBounds(catalog.warehouses.map((w) => [w.lat, w.lon]), {paddingTopLeft: [85, 40], paddingBottomRight: [105, 55], maxZoom: 10, animate: false});
+  const locations = catalog.warehouses;
+  map.fitBounds([[Math.min(...locations.map(w => w.lon)), Math.min(...locations.map(w => w.lat))], [Math.max(...locations.map(w => w.lon)), Math.max(...locations.map(w => w.lat))]], {padding: {top: 55, bottom: 50, left: 70, right: 70}, maxZoom: 10, pitch: 0, bearing: 0, duration: 0});
+}
+
+function setMap3D(enabled) {
+  map3D = enabled && mapVectorReady;
+  $('#map-3d').setAttribute('aria-pressed', String(map3D));
+  $('#map-3d').textContent = map3D ? 'Volver a 2D' : 'Vista 3D';
+  $('#basemap-status').textContent = mapVectorReady ? `Bright / OpenFreeMap · ${map3D ? '3D: arrastra para explorar' : 'Vista general 2D'}` : 'Base alternativa · OpenStreetMap';
+  if (map3D) {
+    if (!selection) chooseWarehouse(catalog.warehouses[0].id);
+    else focusWarehouse(selection);
+  } else fitWarehouseMap();
 }
 
 function initializeMap() {
-  if (!window.L) { $('#map-fallback').hidden = false; return; }
-  map = L.map('map', {scrollWheelZoom: false, zoomControl: false}).setView([40.423, -3.68], 10);
-  L.control.zoom({position: 'bottomright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar'}).addTo(map);
-  let vectorLayer, baseReady = false, fallbackUsed = false;
+  if (!window.maplibregl) { $('#map-fallback').hidden = false; $('#map-3d').disabled = true; return; }
+  maplibregl.setWorkerUrl(new URL('assets/vendor/maplibre-gl-csp-worker.js', window.location.href).href);
+  map = new maplibregl.Map({container: 'map', style: 'https://tiles.openfreemap.org/styles/bright', center: [-3.68, 40.423], zoom: 10, attributionControl: false});
+  map.scrollZoom.disable();
+  map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), 'bottom-right');
+  map.addControl(new maplibregl.AttributionControl({compact: true}), 'bottom-right');
+  let fallbackUsed = false;
   const fallback = () => {
-    if (fallbackUsed) return;
+    if (mapVectorReady || fallbackUsed) return;
     fallbackUsed = true;
-    if (vectorLayer && map.hasLayer(vectorLayer)) map.removeLayer(vectorLayer);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+    map.setStyle({version: 8, sources: {osm: {type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}}, layers: [{id: 'osm', type: 'raster', source: 'osm'}]});
+    $('#map-3d').disabled = true;
     $('#basemap-status').textContent = 'Base alternativa · OpenStreetMap';
   };
-  try {
-    maplibregl.setWorkerUrl(new URL('assets/vendor/maplibre-gl-csp-worker.js', window.location.href).href);
-    vectorLayer = L.maplibreGL({
-      style: 'https://tiles.openfreemap.org/styles/positron',
-      attributionControl: {customAttribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}
-    }).addTo(map);
-    vectorLayer.getMaplibreMap().once('idle', () => {
-      if (fallbackUsed) return;
-      baseReady = true;
-      $('#basemap-status').textContent = 'Base vectorial · Positron / OpenFreeMap';
-    });
-    setTimeout(() => { if (!baseReady) fallback(); }, 15000);
-  } catch (error) {
-    fallback();
-  }
+  map.once('style.load', () => {
+    if (fallbackUsed) return;
+    const label = map.getStyle().layers.find(layer => layer.type === 'symbol' && layer.layout?.['text-field']);
+    map.addLayer({id: 'warehouse-buildings-3d', source: 'openmaptiles', 'source-layer': 'building', type: 'fill-extrusion', minzoom: 14, filter: ['!=', ['get', 'hide_3d'], true], paint: {'fill-extrusion-color': '#d3c6b4', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 5], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.88}}, label?.id);
+  });
+  map.once('idle', () => {
+    if (fallbackUsed) return;
+    mapVectorReady = true;
+    $('#map-3d').disabled = false;
+    setMap3D(false);
+  });
+  setTimeout(fallback, 20000);
   catalog.warehouses.forEach((warehouse, index) => {
-    const marker = L.marker([warehouse.lat, warehouse.lon], {icon: markerIcon(warehouse.id, index), title: `Seleccionar ${warehouse.name}`, keyboard: true}).addTo(map);
-    marker.bindTooltip(`<strong>${escapeHtml(warehouse.name.replace('Madrid ', ''))}</strong><span>${escapeHtml(warehouse.code)}</span>`, {permanent: true, direction: ['leganes', 'pedrezuela'].includes(warehouse.id) ? 'left' : 'right', offset: [['leganes', 'pedrezuela'].includes(warehouse.id) ? -17 : 17, 0], className: 'warehouse-label', opacity: 1});
-    marker.on('click', () => chooseWarehouse(selection === warehouse.id ? '' : warehouse.id));
-    markers.push({marker, warehouse, index});
+    const element = document.createElement('button');
+    element.type = 'button'; element.className = 'warehouse-map-marker';
+    element.setAttribute('aria-label', `Seleccionar ${warehouse.name}`);
+    element.setAttribute('aria-pressed', 'false');
+    element.innerHTML = `<span class="warehouse-marker"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M3 10 12 4l9 6v10H3Z M8 20v-7h8v7 M8 16h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><i>${index + 1}</i></span><span class="warehouse-map-label"><strong>${escapeHtml(warehouse.name.replace('Madrid ', ''))}</strong><small>${escapeHtml(warehouse.code)}</small></span>`;
+    element.addEventListener('click', () => chooseWarehouse(selection === warehouse.id ? '' : warehouse.id));
+    new maplibregl.Marker({element, anchor: 'center'}).setLngLat([warehouse.lon, warehouse.lat]).addTo(map);
+    markers.push({element, warehouse});
   });
   fitWarehouseMap();
-  map.on('resize', fitWarehouseMap);
 }
 
 function showTab(id) {
@@ -133,7 +146,7 @@ function showTab(id) {
   document.querySelectorAll('.view').forEach((section) => { section.hidden = section.id !== id; });
   document.querySelectorAll('[data-tab]').forEach((button) => { button.classList.toggle('active', button.dataset.tab === id); button.setAttribute('aria-current', button.dataset.tab === id ? 'page' : 'false'); });
   $('#page-title').textContent = titles[id];
-  if (id === 'overview' && map) requestAnimationFrame(() => map.invalidateSize());
+  if (id === 'overview' && map) requestAnimationFrame(() => map.resize());
 }
 
 function updateSamples() {
@@ -227,12 +240,13 @@ async function init() {
     $('#submit').disabled = runtime === 'snapshot';
     $('#file').disabled = runtime === 'snapshot';
     updateSamples();
-    initializeMap();
+    try { initializeMap(); } catch (error) { $('#map-fallback').hidden = false; $('#map-3d').disabled = true; $('#basemap-status').textContent = 'Cartografía no disponible'; }
     render();
     document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
     document.querySelectorAll('[data-warehouse]').forEach((b) => b.addEventListener('click', () => chooseWarehouse(selection === b.dataset.warehouse ? '' : b.dataset.warehouse)));
     $('#warehouse').addEventListener('change', (e) => chooseWarehouse(e.target.value));
-    $('#map-reset').addEventListener('click', () => { chooseWarehouse(''); fitWarehouseMap(); });
+    $('#map-3d').addEventListener('click', () => setMap3D(!map3D));
+    $('#map-reset').addEventListener('click', () => { chooseWarehouse(''); setMap3D(false); });
     $('#go-upload').addEventListener('click', () => showTab('upload'));
     $('#all-runs').addEventListener('click', () => showTab('runs'));
     $('#refresh').addEventListener('click', () => refresh());
