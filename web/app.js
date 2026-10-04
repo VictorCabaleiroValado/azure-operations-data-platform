@@ -57,8 +57,20 @@ function render() {
   $('#runs-table').innerHTML = runTable(view.runs.filter((r) => !$('#status-filter').value || r.status === $('#status-filter').value));
   const newest = view.runs.find((r) => r.status === 'completed');
   $('#freshness').textContent = newest ? `Última carga válida: ${dateTime(newest.finished_at)}` : 'Sin cargas válidas';
-  document.querySelectorAll('[data-warehouse]').forEach((b) => b.classList.toggle('selected', b.dataset.warehouse === selection));
-  markers.forEach(({marker, warehouse, index}) => marker.setIcon(markerIcon(warehouse.id, index)));
+  document.querySelectorAll('[data-warehouse]').forEach((b) => {
+    const selected = b.dataset.warehouse === selection;
+    b.classList.toggle('selected', selected);
+    b.setAttribute('aria-pressed', String(selected));
+    const stock = filteredState(data, b.dataset.warehouse);
+    b.querySelector('.warehouse-stock').textContent = `${number(stock.units)} uds. · ${stock.references} referencias`;
+  });
+  markers.forEach(({marker, warehouse, index}) => {
+    marker.setIcon(markerIcon(warehouse.id, index));
+    marker.getElement()?.setAttribute('aria-label', `Seleccionar ${warehouse.name}`);
+    marker.getElement()?.setAttribute('aria-pressed', String(selection === warehouse.id));
+    marker.setZIndexOffset(selection === warehouse.id ? 1000 : 0);
+    marker.getTooltip()?.getElement()?.classList.toggle('is-selected', selection === warehouse.id);
+  });
   renderInventory();
 }
 
@@ -70,21 +82,28 @@ function chooseWarehouse(id) {
 }
 
 function markerIcon(id, index) {
-  return L.divIcon({className: '', html: `<span class="warehouse-marker ${selection === id ? 'selected' : ''}">${index + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15]});
+  const building = '<svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M3 10 12 4l9 6v10H3Z M8 20v-7h8v7 M8 16h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  return L.divIcon({className: 'warehouse-pin', html: `<span class="warehouse-marker ${selection === id ? 'selected' : ''}">${building}<i>${index + 1}</i></span>`, iconSize: [36, 36], iconAnchor: [18, 18]});
+}
+
+function fitWarehouseMap() {
+  if (!map) return;
+  map.fitBounds(catalog.warehouses.map((w) => [w.lat, w.lon]), {paddingTopLeft: [85, 40], paddingBottomRight: [105, 55], maxZoom: 10, animate: false});
 }
 
 function initializeMap() {
   if (!window.L) { $('#map-fallback').hidden = false; return; }
-  map = L.map('map', {scrollWheelZoom: false}).setView([40.423, -3.68], 10);
+  map = L.map('map', {scrollWheelZoom: false, zoomControl: false}).setView([40.423, -3.68], 10);
+  L.control.zoom({position: 'bottomright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar'}).addTo(map);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
   catalog.warehouses.forEach((warehouse, index) => {
     const marker = L.marker([warehouse.lat, warehouse.lon], {icon: markerIcon(warehouse.id, index), title: `Seleccionar ${warehouse.name}`, keyboard: true}).addTo(map);
-    marker.getElement()?.setAttribute('aria-label', `Seleccionar ${warehouse.name}`);
-    marker.bindTooltip(`${warehouse.code} · ${warehouse.name}`);
+    marker.bindTooltip(`<strong>${escapeHtml(warehouse.name.replace('Madrid ', ''))}</strong><span>${escapeHtml(warehouse.code)}</span>`, {permanent: true, direction: ['leganes', 'pedrezuela'].includes(warehouse.id) ? 'left' : 'right', offset: [['leganes', 'pedrezuela'].includes(warehouse.id) ? -17 : 17, 0], className: 'warehouse-label', opacity: 1});
     marker.on('click', () => chooseWarehouse(selection === warehouse.id ? '' : warehouse.id));
     markers.push({marker, warehouse, index});
   });
-  map.fitBounds(catalog.warehouses.map((w) => [w.lat, w.lon]), {padding: [30, 30], maxZoom: 10});
+  fitWarehouseMap();
+  map.on('resize', fitWarehouseMap);
 }
 
 function showTab(id) {
@@ -181,7 +200,7 @@ async function init() {
     $('#upload-warehouse').innerHTML = options;
     $('#supplier').innerHTML = catalog.suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
     $('#supplier-formats').innerHTML = catalog.suppliers.map((s) => `<div class="format"><h3>${escapeHtml(s.name)}</h3><code>${escapeHtml(s.fields.join(s.delimiter + ' '))}</code></div>`).join('');
-    $('#warehouse-buttons').innerHTML = catalog.warehouses.map((w, i) => `<button data-warehouse="${w.id}">${i + 1} · ${escapeHtml(w.name.replace('Madrid ', ''))}</button>`).join('');
+    $('#warehouse-buttons').innerHTML = catalog.warehouses.map((w, i) => `<button data-warehouse="${w.id}" aria-pressed="false"><span class="warehouse-number">0${i + 1}</span><span><strong>${escapeHtml(w.name.replace('Madrid ', ''))}</strong><small class="warehouse-stock"></small></span><span class="warehouse-arrow" aria-hidden="true">↗</span></button>`).join('');
     $('#upload-policy').textContent = runtime === 'snapshot' ? 'La carga está desactivada en esta copia estática. Usa la aplicación Azure o ejecuta el proyecto localmente.' : runtime === 'azure' ? 'Demo pública: solo los ejemplos descargables del proveedor y almacén seleccionados. Para archivos propios, usa el modo local.' : 'Modo local: puedes editar los ejemplos y cargar tus propios CSV con el formato indicado.';
     $('#submit').disabled = runtime === 'snapshot';
     $('#file').disabled = runtime === 'snapshot';
@@ -191,6 +210,7 @@ async function init() {
     document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
     document.querySelectorAll('[data-warehouse]').forEach((b) => b.addEventListener('click', () => chooseWarehouse(selection === b.dataset.warehouse ? '' : b.dataset.warehouse)));
     $('#warehouse').addEventListener('change', (e) => chooseWarehouse(e.target.value));
+    $('#map-reset').addEventListener('click', () => { chooseWarehouse(''); fitWarehouseMap(); });
     $('#go-upload').addEventListener('click', () => showTab('upload'));
     $('#all-runs').addEventListener('click', () => showTab('runs'));
     $('#refresh').addEventListener('click', () => refresh());
