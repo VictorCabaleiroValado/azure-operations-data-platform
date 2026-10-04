@@ -95,7 +95,29 @@ function initializeMap() {
   if (!window.L) { $('#map-fallback').hidden = false; return; }
   map = L.map('map', {scrollWheelZoom: false, zoomControl: false}).setView([40.423, -3.68], 10);
   L.control.zoom({position: 'bottomright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar'}).addTo(map);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  let vectorLayer, baseReady = false, fallbackUsed = false;
+  const fallback = () => {
+    if (fallbackUsed) return;
+    fallbackUsed = true;
+    if (vectorLayer && map.hasLayer(vectorLayer)) map.removeLayer(vectorLayer);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+    $('#basemap-status').textContent = 'Base alternativa · OpenStreetMap';
+  };
+  try {
+    maplibregl.setWorkerUrl(new URL('assets/vendor/maplibre-gl-csp-worker.js', window.location.href).href);
+    vectorLayer = L.maplibreGL({
+      style: 'https://tiles.openfreemap.org/styles/positron',
+      attributionControl: {customAttribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}
+    }).addTo(map);
+    vectorLayer.getMaplibreMap().once('idle', () => {
+      if (fallbackUsed) return;
+      baseReady = true;
+      $('#basemap-status').textContent = 'Base vectorial · Positron / OpenFreeMap';
+    });
+    setTimeout(() => { if (!baseReady) fallback(); }, 15000);
+  } catch (error) {
+    fallback();
+  }
   catalog.warehouses.forEach((warehouse, index) => {
     const marker = L.marker([warehouse.lat, warehouse.lon], {icon: markerIcon(warehouse.id, index), title: `Seleccionar ${warehouse.name}`, keyboard: true}).addTo(map);
     marker.bindTooltip(`<strong>${escapeHtml(warehouse.name.replace('Madrid ', ''))}</strong><span>${escapeHtml(warehouse.code)}</span>`, {permanent: true, direction: ['leganes', 'pedrezuela'].includes(warehouse.id) ? 'left' : 'right', offset: [['leganes', 'pedrezuela'].includes(warehouse.id) ? -17 : 17, 0], className: 'warehouse-label', opacity: 1});

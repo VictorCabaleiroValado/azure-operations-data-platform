@@ -26,4 +26,4 @@ The public API exposes only synthetic fixtures. It rejects arbitrary uploads and
 
 ## Map and presentation
 
-Leaflet 1.9.4 is vendored with its licence. OpenStreetMap tiles are requested by the visitor's browser for its visible viewport, with attribution, normal caching and Referer headers. No bulk tile downloads. A button list provides equivalent warehouse selection if map tiles are unavailable. Hosting and tile providers can change independently.
+Leaflet 1.9.4, MapLibre GL JS 5.6.2 and the MapLibre Leaflet adapter 0.1.4 are vendored with their licences. The primary basemap is the OpenFreeMap Positron vector style, loaded by the browser with visible OpenFreeMap/OpenMapTiles/OpenStreetMap attribution. The CSP worker bundle runs from the same origin; network access is limited to the map provider. If WebGL or the initial vector load fails, a labelled OpenStreetMap raster fallback is used, with attribution, normal caching and Referer headers. No bulk tile downloads. A button list provides equivalent warehouse selection if map tiles are unavailable. Hosting and tile providers can change independently.

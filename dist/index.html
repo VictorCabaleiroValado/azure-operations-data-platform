@@ -6,8 +6,11 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Azure Operations · Distribución de electrónica</title>
   <link rel="stylesheet" href="./assets/vendor/leaflet.css">
+  <link rel="stylesheet" href="./assets/vendor/maplibre-gl.css">
   <link rel="stylesheet" href="./assets/styles.css">
   <script src="./assets/vendor/leaflet.js" defer></script>
+  <script src="./assets/vendor/maplibre-gl-csp.js" defer></script>
+  <script src="./assets/vendor/leaflet-maplibre-gl.js" defer></script>
   <script src="./assets/app.js" defer></script>
 </head>
 <body>
@@ -34,7 +37,7 @@
       <section id="overview" class="view">
         <div class="kpis"><article><span>Unidades registradas</span><strong id="units">—</strong><small>Última carga válida de cada proveedor</small></article><article><span>Valor a coste</span><strong id="value">—</strong><small>Unidades × coste del proveedor</small></article><article><span>Referencias</span><strong id="references">—</strong><small>Productos distintos en la selección</small></article><article><span>Revisar existencias</span><strong id="low-stock">—</strong><small>Producto / almacén con menos de 10 uds.</small></article></div>
         <div class="overview-grid">
-          <article class="panel map-panel"><div class="panel-heading"><div><p class="map-eyebrow">RED LOGÍSTICA</p><h2>Almacenes en Madrid</h2><p>Cuatro ubicaciones, una vista de operaciones</p></div><button id="map-reset" class="map-reset" type="button" aria-label="Mostrar todos los almacenes en el mapa">Ver toda la red ↗</button></div><div class="map-frame"><div id="map" aria-label="Mapa de almacenes en Madrid"></div><div class="map-legend"><span></span> Almacenes de demostración</div></div><div id="map-fallback" hidden>El mapa no está disponible. Puedes seleccionar un almacén en la lista.</div><div id="warehouse-buttons" class="warehouse-buttons"></div><p class="map-caption">Cartografía real · ubicaciones empresariales ficticias</p></article>
+          <article class="panel map-panel"><div class="panel-heading"><div><p class="map-eyebrow">RED LOGÍSTICA</p><h2>Almacenes en Madrid</h2><p>Cuatro ubicaciones, una vista de operaciones</p></div><button id="map-reset" class="map-reset" type="button" aria-label="Mostrar todos los almacenes en el mapa">Ver toda la red ↗</button></div><div class="map-frame"><div id="map" aria-label="Mapa de almacenes en Madrid"></div><div class="map-legend"><span></span> Almacenes de demostración</div></div><div id="map-fallback" hidden>El mapa no está disponible. Puedes seleccionar un almacén en la lista.</div><div id="warehouse-buttons" class="warehouse-buttons"></div><p class="map-caption"><span id="basemap-status">Cargando cartografía vectorial…</span> · Ubicaciones ficticias</p></article>
           <article class="panel"><div class="panel-heading"><div><h2>Estado de las cargas</h2><p id="run-scope">Todos los almacenes</p></div></div><div id="run-summary" class="run-summary"></div><div class="explanation"><h3>¿De dónde sale el inventario?</h3><p>Cada proveedor envía una fotografía completa de sus existencias. Se utiliza la fecha de stock más reciente; un archivo rechazado conserva la última versión válida.</p></div></article>
         </div>
         <article class="panel"><div class="panel-heading"><div><h2>Últimos archivos</h2><p>Selecciona una fila para ver el resultado</p></div><button class="quiet" id="all-runs">Ver todos →</button></div><div id="recent-runs" class="table-wrap"></div></article>

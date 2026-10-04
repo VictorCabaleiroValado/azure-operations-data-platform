@@ -65,7 +65,7 @@ def create_app(store=None, local_worker=True):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         )
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
