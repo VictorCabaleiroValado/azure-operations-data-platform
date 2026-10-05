@@ -46,9 +46,9 @@ Verification performed for this edition:
 - 25 Python tests passed, including two new checks for legacy inventory labels and errors without rewriting stored evidence. Ruff and JavaScript syntax checks passed.
 - JavaScript checks passed for all five warehouse filters, integer totals, CSV row scope and HTML escaping.
 - A temporary headless Edge test checked both local static copies: all five tabs, English labels, Pedrezuela's 549 units, English laptop search, rejected-run error details and disabled static uploads. No JavaScript page errors or horizontal overflow at 390 px were observed. Desktop layout was also visually inspected. External basemap tiles and 3D readiness were not confirmed during this local check.
-- `git fetch origin` succeeded. The local baseline and `origin/main` both point to `e15048c`; translation changes remain uncommitted local work.
+- `git fetch origin` succeeded. The local baseline and `origin/main` both point to `e15048c`; translation changes were still uncommitted at that local checkpoint.
 
-These checks establish local readiness only. This English edition has not been pushed to GitHub, published to GitHub Pages or deployed to Azure. Next publication steps are to commit/push the reviewed changes, publish `dist/`, build an immutable Azure image, update the portal and worker to that image, and verify the live English interface and existing processing behavior. Victor authorized publication to GitHub Pages and Azure on 5 October 2026; deployment verification follows below once completed.
+Those initial checks established local readiness only. Victor then authorized publication to GitHub Pages and Azure on 5 October 2026; the completed deployment is recorded below.
 
 ### Published English release
 
@@ -63,3 +63,18 @@ Victor authorized publication and explicitly authorized reading the synthetic li
 - A read-only headless Edge walkthrough of both published applications verified five tabs, English labels, Pedrezuela's 549 units, English product search, historical errors, appropriate upload availability and no horizontal overflow at 390 px. No JavaScript page errors were observed.
 
 No new live uploads or worker executions were triggered for this language release. The duplicate/rejection/correction behavior passed local and GitHub CI tests; the earlier cloud execution evidence remains historical. External map tile rendering and 3D readiness were not reverified in this release. No personal payments or account-plan changes were made.
+
+### Follow-up functional audit — 5 October 2026
+
+A full follow-up audit found and fixed one presentation defect: the upload form's intrinsic grid sizing caused horizontal overflow at 320 px. Form and label grids now use a zero minimum column width, preserving usable controls within the available width. The stylesheet cache version and both local static copies were updated. Earlier local-only publication wording above was clarified as historical.
+
+Checks completed:
+
+- 25 Python tests, Ruff, JavaScript filter/CSV checks and dependency compatibility (`pip check`) passed. GitHub Validate for `8c23644` also succeeded, including the Docker build and container health check.
+- A fresh local application with isolated temporary storage processed all three supplier formats across four warehouses through the browser. Accepted upload, identical duplicate, invalid-file rejection with unchanged stock, and corrected snapshot replacement all passed. Final local state matched the expected 14 runs, 48 inventory rows, 2,417 units and EUR 358,052 at cost.
+- 40 combinations of warehouse, text query and low-stock filtering matched the underlying records. The downloaded English CSV contained exactly the selected Pedrezuela/EL-101 row.
+- All five tabs passed layout checks at 320, 390, 768 and 1,440 px after the fix, with no JavaScript page errors. The corrected narrow-screen upload form was visually inspected.
+- Live OpenFreeMap vector loading, the 3D camera, warehouse selection and return to the full network passed on both Azure and Pages. Simulating an unavailable vector provider locally activated the raster fallback, disabled 3D and retained warehouse filters.
+- All 30 files in `dist/` and `MAIN/` matched before the audit; updated HTML/CSS were synchronized again after the fix. All 14 input fixture files retain their original bytes. The live synthetic inventory and run-ID hashes still matched the approved snapshot.
+
+Scope: live Azure verification is read-only. No new cloud upload or queue-triggered processing execution was performed. Local browser tests exercised real local processing, while cloud worker configuration and existing records were checked separately. A separate local wheel build could not run because the local environment lacks `setuptools`; the successful GitHub Docker build provides packaging verification. The test runner emits a non-failing upstream Starlette/httpx deprecation warning. These bounded functional checks do not establish production-scale load or availability guarantees.
