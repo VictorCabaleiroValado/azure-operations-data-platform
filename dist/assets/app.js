@@ -1,18 +1,18 @@
 /* The browser displays API results; processing and SQL run on the server. */
 'use strict';
 const $ = (selector) => document.querySelector(selector);
-const money = (cents) => new Intl.NumberFormat('es-ES', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(cents / 100);
-const number = (value) => new Intl.NumberFormat('es-ES').format(value);
+const money = (cents) => new Intl.NumberFormat('en-GB', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(cents / 100);
+const number = (value) => new Intl.NumberFormat('en-GB').format(value);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
-const labels = {queued: 'En cola', processing: 'Procesando', completed: 'Completado', rejected: 'Rechazado', failed: 'Fallo técnico'};
-const titles = {overview: 'Operaciones de almacén', inventory: 'Inventario', upload: 'Recepción de archivos', runs: 'Procesamientos', cloud: 'El sistema en Azure'};
+const labels = {queued: 'Queued', processing: 'Processing', completed: 'Completed', rejected: 'Rejected', failed: 'Technical failure'};
+const titles = {overview: 'Warehouse operations', inventory: 'Inventory', upload: 'File intake', runs: 'Processing runs', cloud: 'The system in Azure'};
 let catalog, data, runtime, map, markers = [], selection = '', activeTab = 'overview', refreshBusy = false, map3D = false, mapVectorReady = false;
 
 async function json(url, options) {
   const response = await fetch(url, options);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body.detail === 'string' ? body.detail : `Error ${response.status}. No se ha completado la operación.`);
+    throw new Error(typeof body.detail === 'string' ? body.detail : `Error ${response.status}. The operation could not be completed.`);
   }
   return response.json();
 }
@@ -26,12 +26,12 @@ function filteredState(source, warehouse) {
 function warehouseName(id) { return catalog.warehouses.find((w) => w.id === id)?.name || id; }
 function supplierName(id) { return catalog.suppliers.find((s) => s.id === id)?.name || id; }
 function badge(status) { return `<span class="status ${escapeHtml(status)}">${escapeHtml(labels[status] || status)}</span>`; }
-function dateTime(value) { return value ? new Date(value).toLocaleString('es-ES', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—'; }
+function dateTime(value) { return value ? new Date(value).toLocaleString('en-GB', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—'; }
 function empty(message) { return `<div class="empty">${escapeHtml(message)}</div>`; }
 
 function runTable(records) {
-  if (!records.length) return empty('No hay archivos en esta selección.');
-  return `<table><thead><tr><th>Archivo / proveedor</th><th>Almacén</th><th>Estado</th><th>Filas</th><th>Recibido</th></tr></thead><tbody>${records.map((r) => `<tr><td><button class="row-button" data-run="${r.id}">${escapeHtml(r.filename)}</button><small>${escapeHtml(supplierName(r.supplier))}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${badge(r.status)}</td><td>${r.row_count || '—'}</td><td>${dateTime(r.received_at)}</td></tr>`).join('')}</tbody></table>`;
+  if (!records.length) return empty('No files in this selection.');
+  return `<table><thead><tr><th>File / supplier</th><th>Warehouse</th><th>Status</th><th>Rows</th><th>Received</th></tr></thead><tbody>${records.map((r) => `<tr><td><button class="row-button" data-run="${r.id}">${escapeHtml(r.filename)}</button><small>${escapeHtml(supplierName(r.supplier))}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${badge(r.status)}</td><td>${r.row_count || '—'}</td><td>${dateTime(r.received_at)}</td></tr>`).join('')}</tbody></table>`;
 }
 
 function visibleInventory() {
@@ -41,8 +41,8 @@ function visibleInventory() {
 
 function renderInventory() {
   const rows = visibleInventory();
-  $('#inventory-count').textContent = `${rows.length} productos / almacén`;
-  $('#inventory-table').innerHTML = rows.length ? `<table><thead><tr><th>Producto</th><th>Almacén</th><th>Categoría</th><th>Unidades</th><th>Valor a coste</th><th>Fecha de stock</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escapeHtml(r.product)}<small>${escapeHtml(r.sku)}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${escapeHtml(r.category)}</td><td class="${r.quantity < 10 ? 'low' : ''}">${number(r.quantity)}${r.quantity < 10 ? ' · revisar' : ''}</td><td>${money(r.value_cents)}</td><td>${escapeHtml(r.oldest_snapshot)}${r.oldest_snapshot !== r.newest_snapshot ? ' – ' + escapeHtml(r.newest_snapshot) : ''}</td></tr>`).join('')}</tbody></table>` : empty('No hay productos con estos filtros.');
+  $('#inventory-count').textContent = `${rows.length} products / warehouse`;
+  $('#inventory-table').innerHTML = rows.length ? `<table><thead><tr><th>Product</th><th>Warehouse</th><th>Category</th><th>Units</th><th>Value at cost</th><th>Stock date</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escapeHtml(r.product)}<small>${escapeHtml(r.sku)}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${escapeHtml(r.category)}</td><td class="${r.quantity < 10 ? 'low' : ''}">${number(r.quantity)}${r.quantity < 10 ? ' · review' : ''}</td><td>${money(r.value_cents)}</td><td>${escapeHtml(r.oldest_snapshot)}${r.oldest_snapshot !== r.newest_snapshot ? ' – ' + escapeHtml(r.newest_snapshot) : ''}</td></tr>`).join('')}</tbody></table>` : empty('No products match these filters.');
 }
 
 function render() {
@@ -51,18 +51,18 @@ function render() {
   $('#value').textContent = money(view.value);
   $('#references').textContent = view.references;
   $('#low-stock').textContent = view.low;
-  $('#run-scope').textContent = selection ? warehouseName(selection) : 'Todos los almacenes';
+  $('#run-scope').textContent = selection ? warehouseName(selection) : 'All warehouses';
   $('#run-summary').innerHTML = ['completed', 'rejected', 'queued', 'processing', 'failed'].map((status) => `<div class="status-line"><span><i class="status-dot ${status}"></i>${labels[status]}</span><strong>${view.runs.filter((r) => r.status === status).length}</strong></div>`).join('');
   $('#recent-runs').innerHTML = runTable(view.runs.slice(0, 5));
   $('#runs-table').innerHTML = runTable(view.runs.filter((r) => !$('#status-filter').value || r.status === $('#status-filter').value));
   const newest = view.runs.find((r) => r.status === 'completed');
-  $('#freshness').textContent = newest ? `Última carga válida: ${dateTime(newest.finished_at)}` : 'Sin cargas válidas';
+  $('#freshness').textContent = newest ? `Latest valid upload: ${dateTime(newest.finished_at)}` : 'No valid uploads';
   document.querySelectorAll('[data-warehouse]').forEach((b) => {
     const selected = b.dataset.warehouse === selection;
     b.classList.toggle('selected', selected);
     b.setAttribute('aria-pressed', String(selected));
     const stock = filteredState(data, b.dataset.warehouse);
-    b.querySelector('.warehouse-stock').textContent = `${number(stock.units)} uds. · ${stock.references} referencias`;
+    b.querySelector('.warehouse-stock').textContent = `${number(stock.units)} units · ${stock.references} references`;
   });
   markers.forEach(({element, warehouse}) => {
     element.classList.toggle('selected', selection === warehouse.id);
@@ -93,8 +93,8 @@ function fitWarehouseMap() {
 function setMap3D(enabled) {
   map3D = enabled && mapVectorReady;
   $('#map-3d').setAttribute('aria-pressed', String(map3D));
-  $('#map-3d').textContent = map3D ? 'Volver a 2D' : 'Vista 3D';
-  $('#basemap-status').textContent = mapVectorReady ? `Bright / OpenFreeMap · ${map3D ? '3D: arrastra para explorar' : 'Vista general 2D'}` : 'Base alternativa · OpenStreetMap';
+  $('#map-3d').textContent = map3D ? 'Back to 2D' : '3D view';
+  $('#basemap-status').textContent = mapVectorReady ? `Bright / OpenFreeMap · ${map3D ? '3D: drag to explore' : '2D overview'}` : 'Fallback basemap · OpenStreetMap';
   if (map3D) {
     if (!selection) chooseWarehouse(catalog.warehouses[0].id);
     else focusWarehouse(selection);
@@ -114,7 +114,7 @@ function initializeMap() {
     fallbackUsed = true;
     map.setStyle({version: 8, sources: {osm: {type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 17, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}}, layers: [{id: 'osm', type: 'raster', source: 'osm'}]});
     $('#map-3d').disabled = true;
-    $('#basemap-status').textContent = 'Base alternativa · OpenStreetMap';
+    $('#basemap-status').textContent = 'Fallback basemap · OpenStreetMap';
   };
   map.once('style.load', () => {
     if (fallbackUsed) return;
@@ -131,7 +131,7 @@ function initializeMap() {
   catalog.warehouses.forEach((warehouse, index) => {
     const element = document.createElement('button');
     element.type = 'button'; element.className = 'warehouse-map-marker';
-    element.setAttribute('aria-label', `Seleccionar ${warehouse.name}`);
+    element.setAttribute('aria-label', `Select ${warehouse.name}`);
     element.setAttribute('aria-pressed', 'false');
     element.innerHTML = `<span class="warehouse-marker"><svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M3 10 12 4l9 6v10H3Z M8 20v-7h8v7 M8 16h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><i>${index + 1}</i></span><span class="warehouse-map-label"><strong>${escapeHtml(warehouse.name.replace('Madrid ', ''))}</strong><small>${escapeHtml(warehouse.code)}</small></span>`;
     element.addEventListener('click', () => chooseWarehouse(selection === warehouse.id ? '' : warehouse.id));
@@ -178,12 +178,12 @@ async function upload(event) {
   const file = $('#file').files[0];
   if (!file) return;
   $('#submit').disabled = true;
-  $('#upload-result').textContent = 'Enviando archivo…';
+  $('#upload-result').textContent = 'Uploading file…';
   try {
-    if (file.size > 512 * 1024) throw new Error('El archivo supera 512 KiB.');
+    if (file.size > 512 * 1024) throw new Error('The file exceeds 512 KiB.');
     const params = new URLSearchParams({supplier: $('#supplier').value, warehouse: $('#upload-warehouse').value, filename: file.name});
     const result = await json(`./api/uploads?${params}`, {method: 'POST', headers: {'Content-Type': 'text/csv'}, body: file});
-    $('#upload-result').innerHTML = `<div class="success-message">${result.duplicate ? 'Archivo ya registrado: se conserva el procesamiento original.' : 'Archivo recibido. El procesador actualizará su estado.'}<br><button class="row-button" data-run="${result.id}">Consultar procesamiento →</button></div>`;
+    $('#upload-result').innerHTML = `<div class="success-message">${result.duplicate ? 'File already recorded: the original processing run is preserved.' : 'File received. The processor will update its status.'}<br><button class="row-button" data-run="${result.id}">View processing run →</button></div>`;
     await refresh();
   } catch (error) { $('#upload-result').textContent = error.message; }
   finally { $('#submit').disabled = false; }
@@ -193,7 +193,7 @@ async function detail(id) {
   try {
     const run = runtime === 'snapshot' ? data.runs.find((r) => r.id === id) : await json(`./api/runs/${id}`);
     if (!run) return;
-    $('#detail-content').innerHTML = `<p class="eyebrow">DETALLE DE PROCESAMIENTO</p><h2>${escapeHtml(run.filename)}</h2>${badge(run.status)}<div class="detail-facts"><div><span>Almacén</span><strong>${escapeHtml(warehouseName(run.warehouse))}</strong></div><div><span>Proveedor</span><strong>${escapeHtml(supplierName(run.supplier))}</strong></div><div><span>Filas leídas</span><strong>${run.row_count}</strong></div><div><span>Intentos de proceso</span><strong>${run.attempts}</strong></div><div><span>Duración de proceso</span><strong>${run.duration_ms === null ? '—' : number(run.duration_ms) + ' ms'}</strong></div><div><span>Fecha del inventario</span><strong>${escapeHtml(run.snapshot_date || '—')}</strong></div><div><span>Entorno de ejecución registrado</span><strong>${escapeHtml(run.runtime)}</strong></div><div><span>Finalizado</span><strong>${dateTime(run.finished_at)}</strong></div></div><p class="muted">ID: ${escapeHtml(run.id)}</p>${run.errors.length ? `<ul class="error-list">${run.errors.slice(0, 100).map((e) => `<li><b>${e.line ? 'Línea ' + e.line : 'Archivo'}:</b> ${escapeHtml(e.message)}</li>`).join('')}</ul><p class="muted">${run.errors.length} errores. Corrige el archivo y vuelve a enviarlo.</p>` : `<p>${run.status === 'completed' ? 'Todas las filas son válidas. Esta fotografía participa en el inventario si es la versión más reciente del proveedor y almacén.' : 'El archivo todavía no ha publicado un resultado válido.'}</p>`}`;
+    $('#detail-content').innerHTML = `<p class="eyebrow">PROCESSING DETAILS</p><h2>${escapeHtml(run.filename)}</h2>${badge(run.status)}<div class="detail-facts"><div><span>Warehouse</span><strong>${escapeHtml(warehouseName(run.warehouse))}</strong></div><div><span>Supplier</span><strong>${escapeHtml(supplierName(run.supplier))}</strong></div><div><span>Rows read</span><strong>${run.row_count}</strong></div><div><span>Processing attempts</span><strong>${run.attempts}</strong></div><div><span>Processing duration</span><strong>${run.duration_ms === null ? '—' : number(run.duration_ms) + ' ms'}</strong></div><div><span>Inventory date</span><strong>${escapeHtml(run.snapshot_date || '—')}</strong></div><div><span>Recorded runtime</span><strong>${escapeHtml(run.runtime)}</strong></div><div><span>Finished</span><strong>${dateTime(run.finished_at)}</strong></div></div><p class="muted">ID: ${escapeHtml(run.id)}</p>${run.errors.length ? `<ul class="error-list">${run.errors.slice(0, 100).map((e) => `<li><b>${e.line ? 'Line ' + e.line : 'File'}:</b> ${escapeHtml(e.message)}</li>`).join('')}</ul><p class="muted">${run.errors.length} errors. Correct the file and submit it again.</p>` : `<p>${run.status === 'completed' ? 'All rows are valid. This snapshot contributes to inventory if it is the latest version for the supplier and warehouse.' : 'The file has not yet published a valid result.'}</p>`}`;
     if (!$('#detail').open) $('#detail').showModal();
   } catch (error) { $('#error').textContent = error.message; $('#error').hidden = false; }
 }
@@ -206,7 +206,7 @@ function csvText(rows) {
 function downloadInventory() {
   const url = URL.createObjectURL(new Blob([csvText(visibleInventory())], {type: 'text/csv;charset=utf-8'}));
   const link = document.createElement('a');
-  link.href = url; link.download = `inventario-${selection || 'madrid'}.csv`; link.click();
+  link.href = url; link.download = `inventory-${selection || 'madrid'}.csv`; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -220,27 +220,27 @@ async function init() {
       [catalog, data] = await Promise.all([json('./api/catalog'), json('./api/state')]);
       runtime = catalog.runtime;
     }
-    $('#runtime').textContent = {snapshot: 'Demo estática', local: 'Ejecución local', azure: 'Conectado a Azure'}[runtime];
-    const note = {snapshot: 'Copia de consulta: los filtros y el mapa funcionan; la carga de archivos requiere la aplicación conectada a Azure o el modo local.', local: 'Procesamiento real en este equipo. Los datos de negocio son sintéticos.', azure: 'Almacenamiento y procesamiento en Azure. La demo pública acepta los ejemplos descargables; las ejecuciones pueden tardar un minuto en comenzar.'}[runtime];
+    $('#runtime').textContent = {snapshot: 'Static demo', local: 'Local runtime', azure: 'Connected to Azure'}[runtime];
+    const note = {snapshot: 'Read-only copy: filters and the map work; file uploads require the Azure-connected application or local mode.', local: 'Actual processing on this computer. Business data is synthetic.', azure: 'Storage and processing in Azure. The public demo accepts the downloadable samples; executions may take a minute to start.'}[runtime];
     $('#runtime-note').textContent = note;
     if (mode.cloud_url) {
       const url = new URL(mode.cloud_url);
       if (url.protocol === 'https:' && url.hostname.endsWith('.azurecontainerapps.io')) {
-        const link = document.createElement('a'); link.href = url.href; link.textContent = ' Abrir aplicación Azure ↗'; $('#runtime-note').append(link);
+        const link = document.createElement('a'); link.href = url.href; link.textContent = ' Open Azure application ↗'; $('#runtime-note').append(link);
       }
     }
-    $('#cloud-proof').textContent = runtime === 'azure' ? 'Esta web está conectada al almacenamiento de Azure. En cada procesamiento puedes comprobar el entorno y la duración registrados por el worker.' : 'Esta vista explica la arquitectura. El entorno actual es ' + (runtime === 'local' ? 'local' : 'una copia estática') + '; no representa una ejecución nueva en Azure.';
+    $('#cloud-proof').textContent = runtime === 'azure' ? 'This application is connected to Azure storage. Each processing run shows the runtime and duration recorded by the worker.' : 'This view explains the architecture. The current runtime is ' + (runtime === 'local' ? 'local' : 'a static copy') + '; it does not represent a new Azure execution.';
     const options = catalog.warehouses.map((w) => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('');
     $('#warehouse').insertAdjacentHTML('beforeend', options);
     $('#upload-warehouse').innerHTML = options;
     $('#supplier').innerHTML = catalog.suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
     $('#supplier-formats').innerHTML = catalog.suppliers.map((s) => `<div class="format"><h3>${escapeHtml(s.name)}</h3><code>${escapeHtml(s.fields.join(s.delimiter + ' '))}</code></div>`).join('');
     $('#warehouse-buttons').innerHTML = catalog.warehouses.map((w, i) => `<button data-warehouse="${w.id}" aria-pressed="false"><span class="warehouse-number">0${i + 1}</span><span><strong>${escapeHtml(w.name.replace('Madrid ', ''))}</strong><small class="warehouse-stock"></small></span><span class="warehouse-arrow" aria-hidden="true">↗</span></button>`).join('');
-    $('#upload-policy').textContent = runtime === 'snapshot' ? 'La carga está desactivada en esta copia estática. Usa la aplicación Azure o ejecuta el proyecto localmente.' : runtime === 'azure' ? 'Demo pública: solo los ejemplos descargables del proveedor y almacén seleccionados. Para archivos propios, usa el modo local.' : 'Modo local: puedes editar los ejemplos y cargar tus propios CSV con el formato indicado.';
+    $('#upload-policy').textContent = runtime === 'snapshot' ? 'Uploads are disabled in this static copy. Use the Azure application or run the project locally.' : runtime === 'azure' ? 'Public demo: only downloadable samples for the selected supplier and warehouse. Use local mode for custom files.' : 'Local mode: edit the samples and upload your own CSV files using the specified format.';
     $('#submit').disabled = runtime === 'snapshot';
     $('#file').disabled = runtime === 'snapshot';
     updateSamples();
-    try { initializeMap(); } catch (error) { $('#map-fallback').hidden = false; $('#map-3d').disabled = true; $('#basemap-status').textContent = 'Cartografía no disponible'; }
+    try { initializeMap(); } catch (error) { $('#map-fallback').hidden = false; $('#map-3d').disabled = true; $('#basemap-status').textContent = 'Basemap unavailable'; }
     render();
     document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
     document.querySelectorAll('[data-warehouse]').forEach((b) => b.addEventListener('click', () => chooseWarehouse(selection === b.dataset.warehouse ? '' : b.dataset.warehouse)));
@@ -261,6 +261,6 @@ async function init() {
     document.addEventListener('click', (event) => { const button = event.target.closest('[data-run]'); if (button) detail(button.dataset.run); });
     $('.dialog-close').addEventListener('click', () => $('#detail').close());
     if (runtime !== 'snapshot') setInterval(() => { if (!document.hidden) refresh(true); }, 12000);
-  } catch (error) { $('#error').textContent = 'No se han podido cargar los datos: ' + error.message; $('#error').hidden = false; $('#runtime').textContent = 'Sin conexión'; }
+  } catch (error) { $('#error').textContent = 'Could not load data: ' + error.message; $('#error').hidden = false; $('#runtime').textContent = 'Disconnected'; }
 }
 init();

@@ -4,97 +4,97 @@
     "supplier": "nexo",
     "warehouse": "centro",
     "kind": "valid",
-    "label": "Nexo Electrónica · Madrid Centro"
+    "label": "Nexo Electronics · Madrid Centro"
   },
   {
     "file": "iberia-centro.csv",
     "supplier": "iberia",
     "warehouse": "centro",
     "kind": "valid",
-    "label": "Iberia Componentes · Madrid Centro"
+    "label": "Iberia Components · Madrid Centro"
   },
   {
     "file": "circuito-centro.csv",
     "supplier": "circuito",
     "warehouse": "centro",
     "kind": "valid",
-    "label": "Circuito Digital · Madrid Centro"
+    "label": "Digital Circuit · Madrid Centro"
   },
   {
     "file": "nexo-leganes.csv",
     "supplier": "nexo",
     "warehouse": "leganes",
     "kind": "valid",
-    "label": "Nexo Electrónica · Leganés"
+    "label": "Nexo Electronics · Leganés"
   },
   {
     "file": "iberia-leganes.csv",
     "supplier": "iberia",
     "warehouse": "leganes",
     "kind": "valid",
-    "label": "Iberia Componentes · Leganés"
+    "label": "Iberia Components · Leganés"
   },
   {
     "file": "circuito-leganes.csv",
     "supplier": "circuito",
     "warehouse": "leganes",
     "kind": "valid",
-    "label": "Circuito Digital · Leganés"
+    "label": "Digital Circuit · Leganés"
   },
   {
     "file": "nexo-sanchinarro.csv",
     "supplier": "nexo",
     "warehouse": "sanchinarro",
     "kind": "valid",
-    "label": "Nexo Electrónica · Sanchinarro"
+    "label": "Nexo Electronics · Sanchinarro"
   },
   {
     "file": "iberia-sanchinarro.csv",
     "supplier": "iberia",
     "warehouse": "sanchinarro",
     "kind": "valid",
-    "label": "Iberia Componentes · Sanchinarro"
+    "label": "Iberia Components · Sanchinarro"
   },
   {
     "file": "circuito-sanchinarro.csv",
     "supplier": "circuito",
     "warehouse": "sanchinarro",
     "kind": "valid",
-    "label": "Circuito Digital · Sanchinarro"
+    "label": "Digital Circuit · Sanchinarro"
   },
   {
     "file": "nexo-pedrezuela.csv",
     "supplier": "nexo",
     "warehouse": "pedrezuela",
     "kind": "valid",
-    "label": "Nexo Electrónica · Pedrezuela"
+    "label": "Nexo Electronics · Pedrezuela"
   },
   {
     "file": "iberia-pedrezuela.csv",
     "supplier": "iberia",
     "warehouse": "pedrezuela",
     "kind": "valid",
-    "label": "Iberia Componentes · Pedrezuela"
+    "label": "Iberia Components · Pedrezuela"
   },
   {
     "file": "circuito-pedrezuela.csv",
     "supplier": "circuito",
     "warehouse": "pedrezuela",
     "kind": "valid",
-    "label": "Circuito Digital · Pedrezuela"
+    "label": "Digital Circuit · Pedrezuela"
   },
   {
     "file": "nexo-centro-errors.csv",
     "supplier": "nexo",
     "warehouse": "centro",
     "kind": "invalid",
-    "label": "Ejemplo con errores · Centro"
+    "label": "Error sample · Centro"
   },
   {
     "file": "nexo-centro-corrected.csv",
     "supplier": "nexo",
     "warehouse": "centro",
     "kind": "correction",
-    "label": "Corrección de existencias · Centro"
+    "label": "Stock correction · Centro"
   }
 ]

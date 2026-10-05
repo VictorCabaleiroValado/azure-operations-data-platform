@@ -1,60 +1,64 @@
-# Entender Azure Operations Data Platform
+# Understanding Azure Operations Data Platform
 
-## La historia
+## The story
 
-Imagina una distribuidora de electrónica con cuatro almacenes: Centro, Leganés, Sanchinarro y Pedrezuela. Tres proveedores envían archivos con sus existencias, cada uno con nombres de columnas diferentes. Tu sistema recibe esos archivos, los revisa y prepara una vista común del inventario.
+Imagine an electronics distributor with four warehouses: Centro, Leganés, Sanchinarro and Pedrezuela. Three suppliers send stock files, each with different column names. Your system receives those files, checks them and prepares a common inventory view.
 
-La empresa y los datos son ficticios. El código, las comprobaciones y los servicios desplegados sí deben verificarse de verdad.
+The company and data are fictional. The code, checks and deployed services must still be verified with real evidence.
 
-## Las cinco piezas
+## The five components
 
-1. **Portal / API:** la web donde seleccionas el almacén y subes un archivo. Una API es la parte que recibe la petición y devuelve los resultados.
-2. **Blob Storage:** el lugar de Azure donde guardamos originales, estados y resultados. Piensa en archivos privados organizados por identificador.
-3. **Queue Storage:** la lista de trabajos pendientes. El mensaje lleva el identificador del archivo, no todo su contenido.
-4. **Container Apps Job:** el programa Python que se pone en marcha para revisar un archivo y termina al acabar.
-5. **Azure Monitor:** los registros que permiten comprobar qué ejecutó el programa y por qué falló.
+1. **Portal / API:** the web application where you select a warehouse and upload a file. An API receives the request and returns results.
+2. **Blob Storage:** Azure storage for originals, statuses and results. Think of private files organized by identifier.
+3. **Queue Storage:** the list of pending jobs. A message carries the file identifier, not its entire contents.
+4. **Container Apps Job:** the Python program that starts to check a file and exits when it finishes.
+5. **Azure Monitor:** logs that show what the program executed and why it failed.
 
-Un contenedor empaqueta el programa y sus dependencias. El mismo paquete sirve para la web y el procesador, con comandos de inicio distintos. Esto simplifica su mantenimiento.
+A container packages the program and its dependencies. The same package serves the web application and processor with different startup commands, simplifying maintenance.
 
-## Qué significa cada estado
+## What each status means
 
-| Estado | Significado |
+| Status | Meaning |
 |---|---|
-| En cola | El archivo está guardado y pendiente de trabajo |
-| Procesando | El worker ha tomado el archivo |
-| Completado | Todas las filas son válidas y el resultado está guardado |
-| Rechazado | Hay errores de datos; el inventario anterior se conserva |
-| Fallo técnico | Se agotaron los intentos de entrega; un operador revisa y reintenta |
+| Queued | The file is stored and awaiting processing |
+| Processing | The worker has picked up the file |
+| Completed | All rows are valid and the result is stored |
+| Rejected | Data errors were found; previous inventory is preserved |
+| Technical failure | Delivery attempts were exhausted; an operator investigates and retries |
 
-Un archivo rechazado necesita una corrección. Un fallo técnico puede resolverse sin cambiar los datos, por ejemplo recuperando acceso al almacenamiento.
+A rejected file needs a correction. A technical failure may be resolved without changing the data, for example by restoring storage access.
 
-## Un ejemplo que puedes defender
+## An example you can explain
 
-Nexo envía ocho portátiles al inventario declarado del almacén Centro. El archivo dice ocho unidades disponibles; no es una entrega que debamos sumar cada vez que llega. Si subes el mismo archivo dos veces, el resultado sigue siendo ocho. Una nueva fotografía corregida de dieciocho unidades sustituye la anterior del mismo proveedor, almacén y fecha. Una fotografía de una fecha más antigua nunca gana a una más nueva.
+Nexo reports eight laptops in the Centro warehouse inventory. The file declares eight available units; it is not a delivery to add every time it arrives. Uploading the same file twice still produces eight units. A corrected snapshot of eighteen units replaces the previous snapshot for the same supplier, warehouse and date. An older snapshot never supersedes a newer one.
 
-El stock de proveedores diferentes se considera formado por lotes independientes. No implementamos ventas, reservas ni transferencias. Los totales usan la última fotografía válida de cada proveedor; pueden mezclar fechas y la web muestra esas fechas.
+Stock from different suppliers is assumed to represent independent lots. Sales, reservations and transfers are not implemented. Totals use each supplier's latest valid snapshot; dates may differ, and the application displays those dates.
 
-## Cómo aprenderlo en orden
+## How to learn the workflow
 
-1. Selecciona cada almacén en el mapa y compara los filtros con el selector de la parte superior.
-2. Descarga un ejemplo; abre sus cuatro columnas y relaciona una fila con un producto.
-3. Sigue el archivo en `api.py`, `service.py` y `validation.py`.
-4. Prueba duplicado, error y corrección; explica por qué el total debe cambiar o permanecer igual.
-5. En Azure, identifica almacenamiento, cola, portal y job. Comprueba una ejecución real y sus logs.
-6. Lee `infra/main.bicep`: relaciona cada recurso con una pieza que ya hayas usado.
-7. Revisa el gasto real. Una alerta avisa, pero no corta el consumo.
+1. Select each warehouse on the map and compare the filters with the selector at the top.
+2. Download a sample, inspect its four columns and connect one row to a product.
+3. Follow the file through `api.py`, `service.py` and `validation.py`.
+4. Test a duplicate, an error and a correction; explain why the total should change or stay the same.
+5. In Azure, identify storage, queue, portal and job. Check a real execution and its logs.
+6. Read `infra/main.bicep` and connect each resource to a component you have used.
+7. Review actual spending. An alert notifies you but does not stop consumption.
 
-## Conceptos profesionales, con ejemplos
+## Professional concepts, with examples
 
-- **Idempotencia:** repetir el mismo archivo no duplica existencias.
-- **Procesamiento por eventos:** el trabajo comienza porque llega un mensaje a la cola.
-- **Identidad administrada:** Azure reconoce al programa y le concede permisos sin guardar una contraseña en el código.
-- **Infraestructura como código:** Bicep describe los recursos para recrearlos.
-- **Observabilidad:** los registros permiten explicar qué pasó con un archivo.
-- **CI:** GitHub ejecuta pruebas antes de dar por válida una versión.
+- **Idempotency:** repeating the same file does not duplicate stock.
+- **Event-driven processing:** work starts when a message arrives in the queue.
+- **Managed identity:** Azure recognizes the program and grants permissions without storing a password in the code.
+- **Infrastructure as code:** Bicep describes resources so they can be recreated.
+- **Observability:** logs explain what happened to a file.
+- **CI:** GitHub runs tests before a version is considered valid.
 
-## Demostración de tres minutos
+## A three-minute demonstration
 
-Selecciona Pedrezuela y muestra el inventario. Pasa a Centro, descarga el archivo con errores, súbelo y abre el resultado. Muestra la corrección y después vuelve a subirla para demostrar que no se duplica. Termina con una ejecución del job en Azure y una decisión que sepas justificar, por ejemplo separar la web del procesamiento.
+Select Pedrezuela and show its inventory. Switch to Centro, download the error sample, upload it and open the result. Show the correction, then upload it again to demonstrate that stock is not duplicated. Finish with an Azure job execution and a decision you can justify, such as separating the web application from processing.
 
-La copia estática permite navegar, pero no subir. En Azure los ejemplos pasan por almacenamiento y cola reales. El modo local permite practicar con archivos propios. Consulta VERIFICATION.md antes de afirmar qué partes se han verificado en Azure.
+The static copy supports navigation but not uploads. In Azure, samples pass through actual storage and a queue. Local mode supports custom files. Consult VERIFICATION.md before stating which components have been verified in Azure.
+
+## Language and supplier contracts
+
+The interface, product labels, messages and documentation use English. Warehouse place names retain their original spelling. Supplier CSV headers retain their source contracts, including Spanish columns, because those names are input data rather than interface labels. Preserving them keeps existing fixtures and content-based processing IDs compatible.

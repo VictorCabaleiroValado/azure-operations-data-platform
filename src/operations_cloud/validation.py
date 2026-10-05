@@ -18,13 +18,13 @@ def validate(content: bytes, supplier: str, today: date | None = None) -> dict:
     if not content or len(content) > MAX_BYTES:
         return {
             "rows": [],
-            "errors": [{"line": 0, "message": "Archivo vacío o superior a 512 KiB."}],
+            "errors": [{"line": 0, "message": "File is empty or exceeds 512 KiB."}],
             "row_count": 0,
         }
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return {"rows": [], "errors": [{"line": 0, "message": "El archivo debe usar UTF-8."}], "row_count": 0}
+        return {"rows": [], "errors": [{"line": 0, "message": "The file must use UTF-8."}], "row_count": 0}
     spec = SUPPLIER_BY_ID[supplier]
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=spec["delimiter"], strict=True)
     dates = set()
@@ -35,7 +35,7 @@ def validate(content: bytes, supplier: str, today: date | None = None) -> dict:
             return {
                 "rows": [],
                 "errors": [
-                    {"line": 1, "message": "Cabecera esperada: " + spec["delimiter"].join(spec["fields"])}
+                    {"line": 1, "message": "Expected header: " + spec["delimiter"].join(spec["fields"])}
                 ],
                 "row_count": 0,
             }
@@ -44,29 +44,29 @@ def validate(content: bytes, supplier: str, today: date | None = None) -> dict:
                 continue
             count += 1
             if count > MAX_ROWS:
-                errors.append({"line": reader.line_num, "message": "Máximo de 5.000 filas por archivo."})
+                errors.append({"line": reader.line_num, "message": "Maximum 5,000 rows per file."})
                 break
             try:
                 if len(values) != 4:
-                    raise ValueError("Se esperan exactamente cuatro columnas.")
+                    raise ValueError("Exactly four columns are required.")
                 sku, quantity, cost, stamp = [v.strip() for v in values]
                 if sku not in PRODUCT_BY_SKU:
-                    raise ValueError("Referencia desconocida; utiliza el catálogo de demostración.")
+                    raise ValueError("Unknown product reference; use the demo catalog.")
                 if sku in seen:
-                    raise ValueError("Referencia duplicada dentro del archivo.")
+                    raise ValueError("Duplicate product reference within the file.")
                 seen.add(sku)
                 if not re.fullmatch(r"\d{1,6}", quantity) or int(quantity) > 100000:
-                    raise ValueError("Unidades: entero entre 0 y 100.000.")
+                    raise ValueError("Quantity: integer between 0 and 100,000.")
                 if not re.fullmatch(r"\d{1,6}([.,]\d{1,2})?", cost):
-                    raise ValueError("Coste: número positivo con hasta dos decimales.")
+                    raise ValueError("Cost: positive number with up to two decimal places.")
                 cents = int(Decimal(cost.replace(",", ".")) * 100)
                 if not 1 <= cents <= 100000000:
-                    raise ValueError("Coste fuera del intervalo permitido.")
+                    raise ValueError("Cost outside the allowed range.")
                 if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", stamp):
-                    raise ValueError("Fecha: utiliza AAAA-MM-DD.")
+                    raise ValueError("Date: use YYYY-MM-DD.")
                 observed = date.fromisoformat(stamp)
                 if observed > today or observed < date(2020, 1, 1):
-                    raise ValueError("Fecha de stock futura o anterior a 2020.")
+                    raise ValueError("Stock date is in the future or before 2020.")
                 dates.add(stamp)
                 product = PRODUCT_BY_SKU[sku]
                 rows.append(
@@ -82,9 +82,9 @@ def validate(content: bytes, supplier: str, today: date | None = None) -> dict:
             except (ValueError, InvalidOperation) as exc:
                 errors.append({"line": reader.line_num, "message": str(exc)})
     except csv.Error:
-        errors.append({"line": reader.line_num, "message": "CSV mal formado; revisa comillas y separadores."})
+        errors.append({"line": reader.line_num, "message": "Malformed CSV; check quotes and delimiters."})
     if count == 0:
-        errors.append({"line": 2, "message": "El archivo no contiene productos."})
+        errors.append({"line": 2, "message": "The file contains no products."})
     if len(dates) > 1:
-        errors.append({"line": 0, "message": "Todas las filas deben compartir la misma fecha de stock."})
+        errors.append({"line": 0, "message": "All rows must share the same stock date."})
     return {"rows": [] if errors else rows, "errors": errors, "row_count": count}

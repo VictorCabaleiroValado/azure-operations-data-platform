@@ -35,7 +35,7 @@ def consume(store, limit=20):
                             errors=[
                                 {
                                     "line": 0,
-                                    "message": "Fallo técnico tras cinco entregas; revisa Azure Monitor y reintenta.",
+                                    "message": "Technical failure after five deliveries; check Azure Monitor and retry.",
                                 }
                             ],
                         )

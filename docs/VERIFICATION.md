@@ -34,3 +34,18 @@ Three queue-triggered job executions succeeded without a manual job start: `oper
 - Azure Monitor / Log Analytics ingestion was independently verified: a KQL query returned twelve `file_processed` events for the first batch. [Query result](../evidence/azure-monitor.json). Later events may appear after the normal ingestion delay.
 
 The static demo now contains a snapshot exported from the Azure API and a link to the live portal. It remains explicitly read-only. Data represents a fictional inventory snapshot, not real business activity.
+
+## English edition — 5 October 2026 (America/Chicago)
+
+The local portal, product/supplier display labels, API and validation messages, sample descriptions, learning guide and professional drafts now use English. The read-only copies in `dist/` and the project's `MAIN/` folder, plus the existing inventory export's display values, were updated. Formatting uses `en-GB` and keeps EUR. Place names, supplier input headers and processing IDs remain compatible with the existing data contract.
+
+Existing stored results are read using current catalog labels before SQL aggregation. Legacy error messages are translated for API presentation; the original stored evidence is not migrated or rewritten. The static snapshot keeps its original Azure run IDs, timestamps, quantities and runtime provenance. Historical provider evidence under `evidence/` remains verbatim.
+
+Verification performed for this edition:
+
+- 25 Python tests passed, including two new checks for legacy inventory labels and errors without rewriting stored evidence. Ruff and JavaScript syntax checks passed.
+- JavaScript checks passed for all five warehouse filters, integer totals, CSV row scope and HTML escaping.
+- A temporary headless Edge test checked both local static copies: all five tabs, English labels, Pedrezuela's 549 units, English laptop search, rejected-run error details and disabled static uploads. No JavaScript page errors or horizontal overflow at 390 px were observed. Desktop layout was also visually inspected. External basemap tiles and 3D readiness were not confirmed during this local check.
+- `git fetch origin` succeeded. The local baseline and `origin/main` both point to `e15048c`; translation changes remain uncommitted local work.
+
+These checks establish local readiness only. This English edition has not been pushed to GitHub, published to GitHub Pages or deployed to Azure. Next publication steps are to commit/push the reviewed changes, publish `dist/`, build an immutable Azure image, update the portal and worker to that image, and verify the live English interface and existing processing behavior. Victor authorized publication to GitHub Pages and Azure on 5 October 2026; deployment verification follows below once completed.

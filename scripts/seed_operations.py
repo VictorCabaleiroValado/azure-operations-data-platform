@@ -46,14 +46,14 @@ def build_samples():
             "supplier": "nexo",
             "warehouse": "centro",
             "kind": "invalid",
-            "label": "Ejemplo con errores · Centro",
+            "label": "Error sample · Centro",
         },
         {
             "file": "nexo-centro-corrected.csv",
             "supplier": "nexo",
             "warehouse": "centro",
             "kind": "correction",
-            "label": "Corrección de existencias · Centro",
+            "label": "Stock correction · Centro",
         },
     ]
     (ROOT / "samples/manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")

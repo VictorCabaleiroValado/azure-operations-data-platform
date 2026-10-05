@@ -227,3 +227,32 @@ def test_queue_transient_failure_is_not_acknowledged(store, monkeypatch):
     consume(store)
     assert acknowledged == [message] and len(dead) == 1
     assert get_run(store, record["id"])["status"] == "failed"
+
+
+def test_legacy_inventory_uses_english_catalog_without_rewriting_results(store):
+    record = load(store)
+    name = f"results/{record['id']}.json"
+    result = json.loads(store.get(name))
+    result["rows"][0].update(product="Portátil Office 14", category="Informática")
+    original = json.dumps(result).encode()
+    store.put(name, original)
+    stock = inventory(store)
+    laptop = next(row for row in stock if row["sku"] == "EL-101")
+    assert laptop["product"] == "Office Laptop 14"
+    assert laptop["category"] == "Computing"
+    assert laptop["quantity"] == 8
+    assert store.get(name) == original
+
+
+def test_legacy_errors_are_english_in_api_without_rewriting_evidence(store):
+    record = load(store, BAD)
+    name = f"runs/{record['id']}.json"
+    record["errors"][0]["message"] = "Unidades: entero entre 0 y 100.000."
+    original = json.dumps(record).encode()
+    store.put(name, original)
+    with TestClient(create_app(store, local_worker=False)) as client:
+        detail = client.get(f"/api/runs/{record['id']}").json()
+        assert detail["errors"][0]["message"] == "Quantity: integer between 0 and 100,000."
+        listing = client.get("/api/state").json()["runs"]
+        assert listing[0]["errors"][0]["message"] == detail["errors"][0]["message"]
+    assert store.get(name) == original

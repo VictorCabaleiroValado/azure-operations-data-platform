@@ -37,36 +37,36 @@ WAREHOUSES = [
 SUPPLIERS = [
     {
         "id": "nexo",
-        "name": "Nexo Electrónica",
+        "name": "Nexo Electronics",
         "delimiter": ",",
         "fields": ["referencia", "unidades", "coste_eur", "fecha_stock"],
     },
     {
         "id": "iberia",
-        "name": "Iberia Componentes",
+        "name": "Iberia Components",
         "delimiter": ";",
         "fields": ["sku", "stock", "precio_eur", "fecha"],
     },
     {
         "id": "circuito",
-        "name": "Circuito Digital",
+        "name": "Digital Circuit",
         "delimiter": ",",
         "fields": ["product_code", "quantity", "unit_cost_eur", "snapshot_date"],
     },
 ]
 PRODUCTS = [
-    {"sku": "EL-101", "name": "Portátil Office 14", "category": "Informática", "cost_cents": 64900},
-    {"sku": "EL-102", "name": "Monitor IPS 27", "category": "Informática", "cost_cents": 17900},
-    {"sku": "EL-103", "name": "Mini PC Work", "category": "Informática", "cost_cents": 38900},
-    {"sku": "EL-201", "name": "Dock USB-C", "category": "Accesorios", "cost_cents": 6900},
-    {"sku": "EL-202", "name": "Teclado inalámbrico", "category": "Accesorios", "cost_cents": 2900},
-    {"sku": "EL-203", "name": "Ratón ergonómico", "category": "Accesorios", "cost_cents": 2400},
-    {"sku": "EL-301", "name": "SSD 1 TB", "category": "Componentes", "cost_cents": 7900},
-    {"sku": "EL-302", "name": "Memoria RAM 16 GB", "category": "Componentes", "cost_cents": 3900},
-    {"sku": "EL-303", "name": "Adaptador de red", "category": "Componentes", "cost_cents": 1900},
-    {"sku": "EL-401", "name": "Auriculares USB", "category": "Audio", "cost_cents": 3400},
-    {"sku": "EL-402", "name": "Altavoz de escritorio", "category": "Audio", "cost_cents": 4500},
-    {"sku": "EL-403", "name": "Micrófono USB", "category": "Audio", "cost_cents": 5900},
+    {"sku": "EL-101", "name": "Office Laptop 14", "category": "Computing", "cost_cents": 64900},
+    {"sku": "EL-102", "name": "27-inch IPS Monitor", "category": "Computing", "cost_cents": 17900},
+    {"sku": "EL-103", "name": "Work Mini PC", "category": "Computing", "cost_cents": 38900},
+    {"sku": "EL-201", "name": "USB-C Dock", "category": "Accessories", "cost_cents": 6900},
+    {"sku": "EL-202", "name": "Wireless Keyboard", "category": "Accessories", "cost_cents": 2900},
+    {"sku": "EL-203", "name": "Ergonomic Mouse", "category": "Accessories", "cost_cents": 2400},
+    {"sku": "EL-301", "name": "SSD 1 TB", "category": "Components", "cost_cents": 7900},
+    {"sku": "EL-302", "name": "16 GB RAM", "category": "Components", "cost_cents": 3900},
+    {"sku": "EL-303", "name": "Network Adapter", "category": "Components", "cost_cents": 1900},
+    {"sku": "EL-401", "name": "USB Headset", "category": "Audio", "cost_cents": 3400},
+    {"sku": "EL-402", "name": "Desktop Speaker", "category": "Audio", "cost_cents": 4500},
+    {"sku": "EL-403", "name": "USB Microphone", "category": "Audio", "cost_cents": 5900},
 ]
 WAREHOUSE_IDS = {w["id"] for w in WAREHOUSES}
 SUPPLIER_BY_ID = {s["id"]: s for s in SUPPLIERS}

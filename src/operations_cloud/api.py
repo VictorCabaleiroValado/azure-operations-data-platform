@@ -92,7 +92,7 @@ def create_app(store=None, local_worker=True):
             "samples": samples,
             "runtime": store.mode,
             "upload_policy": "bundled_samples_only" if store.mode == "azure" else "local_csv",
-            "data_note": "Empresa, proveedores, inventario y ubicaciones de demostración ficticios.",
+            "data_note": "Fictional demo company, suppliers, inventory and locations.",
         }
 
     @app.get("/api/state")
@@ -104,7 +104,7 @@ def create_app(store=None, local_worker=True):
         try:
             return get_run(store, run_id)
         except FileNotFoundError as exc:
-            raise HTTPException(404, "Procesamiento no encontrado.") from exc
+            raise HTTPException(404, "Processing run not found.") from exc
 
     @app.post("/api/uploads", status_code=202)
     async def upload(
@@ -117,7 +117,7 @@ def create_app(store=None, local_worker=True):
         async for chunk in request.stream():
             content.extend(chunk)
             if len(content) > MAX_BYTES:
-                raise HTTPException(413, "Máximo 512 KiB.")
+                raise HTTPException(413, "Maximum 512 KiB.")
         raw = bytes(content)
         if store.mode == "azure":
             allowed = any(
@@ -129,7 +129,7 @@ def create_app(store=None, local_worker=True):
             if not allowed:
                 raise HTTPException(
                     403,
-                    "La demo pública de Azure acepta solo los archivos de ejemplo del almacén seleccionado. Usa el modo local para archivos propios.",
+                    "The public Azure demo accepts only sample files for the selected warehouse. Use local mode for custom files.",
                 )
         try:
             result = await asyncio.to_thread(submit, store, raw, supplier, warehouse, filename)
@@ -142,21 +142,21 @@ def create_app(store=None, local_worker=True):
     def retry_run(run_id: str):
         if store.mode == "azure":
             raise HTTPException(
-                403, "Los reintentos manuales de Azure están reservados al operador mediante CLI."
+                403, "Manual Azure retries are restricted to the operator through the CLI."
             )
         try:
             record = retry(store, run_id)
             cache["at"] = 0
             return record
         except FileNotFoundError as exc:
-            raise HTTPException(404, "Procesamiento no encontrado.") from exc
+            raise HTTPException(404, "Processing run not found.") from exc
         except (ValueError, Busy) as exc:
-            raise HTTPException(409, str(exc) or "Procesamiento ocupado.") from exc
+            raise HTTPException(409, str(exc) or "Processing run is busy.") from exc
 
     @app.get("/api/inventory.csv")
     def export(warehouse: str = ""):
         if warehouse and warehouse not in WAREHOUSE_IDS:
-            raise HTTPException(422, "Almacén desconocido.")
+            raise HTTPException(422, "Unknown warehouse.")
         stock = refresh()["inventory"]
         if warehouse:
             stock = [r for r in stock if r["warehouse"] == warehouse]
@@ -169,7 +169,7 @@ def create_app(store=None, local_worker=True):
     @app.get("/api/samples/{filename}")
     def sample(filename: str):
         if filename not in {s["file"] for s in samples}:
-            raise HTTPException(404, "Ejemplo no encontrado.")
+            raise HTTPException(404, "Sample not found.")
         return FileResponse(ROOT / "samples" / filename, media_type="text/csv", filename=filename)
 
     @app.get("/assets/mode.json")

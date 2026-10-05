@@ -11,7 +11,8 @@ from time import perf_counter
 
 import duckdb
 
-from .catalog import SUPPLIER_BY_ID, WAREHOUSE_IDS
+from .catalog import PRODUCT_BY_SKU, SUPPLIER_BY_ID, WAREHOUSE_IDS
+from .presentation import present_run
 from .store import read_json, write_json
 from .validation import MAX_BYTES, validate
 
@@ -26,12 +27,12 @@ def now():
 def get_run(store, run_id):
     if not re.fullmatch(r"[a-f0-9]{64}", run_id):
         raise FileNotFoundError(run_id)
-    return read_json(store, f"runs/{run_id}.json")
+    return present_run(read_json(store, f"runs/{run_id}.json"))
 
 
 def runs(store):
     return sorted(
-        [read_json(store, p) for p in store.names("runs")],
+        [present_run(read_json(store, p)) for p in store.names("runs")],
         key=lambda r: (r["received_at"], r["id"]),
         reverse=True,
     )
@@ -39,9 +40,9 @@ def runs(store):
 
 def submit(store, content, supplier, warehouse, filename="inventory.csv"):
     if supplier not in SUPPLIER_BY_ID or warehouse not in WAREHOUSE_IDS:
-        raise ValueError("Proveedor o almacén desconocido.")
+        raise ValueError("Unknown supplier or warehouse.")
     if not content or len(content) > MAX_BYTES:
-        raise ValueError("El archivo debe tener entre 1 byte y 512 KiB.")
+        raise ValueError("The file must contain between 1 byte and 512 KiB.")
     identity = b"v1\0" + supplier.encode() + b"\0" + warehouse.encode() + b"\0" + content
     run_id = hashlib.sha256(identity).hexdigest()
     record = {
@@ -111,7 +112,7 @@ def retry(store, run_id):
     with store.lock(run_id):
         record = get_run(store, run_id)
         if record["status"] == "rejected":
-            raise ValueError("Corrige el archivo y vuelve a subirlo; el original se conserva.")
+            raise ValueError("Correct the file and upload it again; the original is preserved.")
         if record["status"] == "completed":
             return record
         record.update(status="queued", errors=[])
@@ -136,6 +137,8 @@ def inventory(store, all_runs=None):
             data.append(
                 {
                     **row,
+                    "product": PRODUCT_BY_SKU[row["sku"]]["name"],
+                    "category": PRODUCT_BY_SKU[row["sku"]]["category"],
                     "warehouse": record["warehouse"],
                     "supplier": record["supplier"],
                     "run_id": record["id"],

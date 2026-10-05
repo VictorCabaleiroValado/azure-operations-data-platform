@@ -9,7 +9,7 @@ The business is fictional. All suppliers, products, quantities and warehouse loc
 ## Try the workflow
 
 1. Select a warehouse on the map. Its inventory and processing history become the active view.
-2. Open **Recibir archivos**, select a supplier and download its sample CSV.
+2. Open **Receive files**, select a supplier and download its sample CSV.
 3. Upload it and follow the processing result. Re-uploading identical contents returns the same processing ID.
 4. For Centro / Nexo, upload the error example, inspect the rejected rows, then upload the correction. Invalid data cannot replace valid inventory.
 
@@ -72,10 +72,10 @@ bicep build infra/budget.bicep
 | `service.py` | Content-based IDs, run lifecycle, snapshot selection and SQL aggregation |
 | `worker.py` | Receive a queue message, process it, acknowledge or retry it |
 | `api.py` | Portal endpoints, public fixture restriction and local processing loop |
-| `web/` | Spanish interface, warehouse map and filters |
+| `web/` | English interface, warehouse map and filters |
 | `infra/main.bicep` | Azure resources and scoped managed-identity permissions |
 
-Python modules live in `src/operations_cloud/`. [Spanish learning guide](docs/LEARNING.md) · [Data definitions](docs/METHODOLOGY.md) · [Architecture decisions](docs/ARCHITECTURE.md) · [Runbook](docs/RUNBOOK.md) · [Costs](docs/COSTS.md).
+Python modules live in `src/operations_cloud/`. [Learning guide](docs/LEARNING.md) · [Data definitions](docs/METHODOLOGY.md) · [Architecture decisions](docs/ARCHITECTURE.md) · [Runbook](docs/RUNBOOK.md) · [Costs](docs/COSTS.md).
 
 ## Portfolio scope
 
