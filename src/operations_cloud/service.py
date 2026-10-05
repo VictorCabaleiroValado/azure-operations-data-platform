@@ -97,6 +97,8 @@ def process(store, run_id):
                         "event": "file_processed",
                         "run_id": run_id,
                         "status": record["status"],
+                        "warehouse": record["warehouse"],
+                        "supplier": record["supplier"],
                         "rows": record["row_count"],
                         "duration_ms": record["duration_ms"],
                     }
@@ -176,6 +178,44 @@ def inventory(store, all_runs=None):
     return aggregated
 
 
+def comparisons(store, records):
+    """Compare adjacent valid business versions, including late-arriving snapshots."""
+    groups = {}
+    for record in records:
+        if record["status"] == "completed":
+            groups.setdefault((record["warehouse"], record["supplier"]), []).append(record)
+    output = {}
+    for versions in groups.values():
+        versions.sort(key=lambda r: (r["snapshot_date"], r["received_at"], r["id"]))
+        previous, before = None, {}
+        for record in versions:
+            after = {r["sku"]: r for r in read_json(store, f"results/{record['id']}.json")["rows"]}
+            changes = []
+            if previous:
+                for sku in sorted(before.keys() | after.keys()):
+                    old, new = before.get(sku), after.get(sku)
+                    if old and new and all(old[k] == new[k] for k in ("quantity", "unit_cost_cents")):
+                        continue
+                    changes.append({
+                        "sku": sku, "product": PRODUCT_BY_SKU[sku]["name"],
+                        "change": "added" if old is None else "removed" if new is None else "changed",
+                        "before_quantity": old["quantity"] if old else 0,
+                        "after_quantity": new["quantity"] if new else 0,
+                        "before_cost_cents": old["unit_cost_cents"] if old else None,
+                        "after_cost_cents": new["unit_cost_cents"] if new else None,
+                    })
+            output[record["id"]] = {
+                "baseline_id": previous["id"] if previous else None,
+                "baseline_date": previous["snapshot_date"] if previous else None,
+                "active": record["id"] == versions[-1]["id"],
+                "units_delta": sum(r["quantity"] for r in after.values()) - sum(r["quantity"] for r in before.values()) if previous else None,
+                "value_delta_cents": sum(r["quantity"] * r["unit_cost_cents"] for r in after.values()) - sum(r["quantity"] * r["unit_cost_cents"] for r in before.values()) if previous else None,
+                "changes": changes,
+            }
+            previous, before = record, after
+    return output
+
+
 def state(store, warehouse=None):
     records = runs(store)
     stock = inventory(store, records)
@@ -184,6 +224,7 @@ def state(store, warehouse=None):
         records = [r for r in records if r["warehouse"] == warehouse]
     return {
         "runs": records,
+        "comparisons": comparisons(store, records),
         "inventory": stock,
         "totals": {
             "units": sum(r["quantity"] for r in stock),

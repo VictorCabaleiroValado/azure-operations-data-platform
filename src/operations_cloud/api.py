@@ -13,7 +13,8 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .catalog import PRODUCTS, SUPPLIERS, WAREHOUSE_IDS, WAREHOUSES
-from .service import csv_bytes, get_run, process, retry, runs, state, submit
+from .monitor import Monitor
+from .service import comparisons, csv_bytes, get_run, process, retry, runs, state, submit
 from .store import Busy, configured_store
 from .validation import MAX_BYTES
 
@@ -23,6 +24,7 @@ ROOT = Path(os.getenv("OPERATIONS_ROOT", Path.cwd()))
 def create_app(store=None, local_worker=True):
     store = store or configured_store()
     cache = {"at": 0.0, "data": None}
+    monitor = Monitor(enabled=store.mode == "azure")
     samples = json.loads((ROOT / "samples/manifest.json").read_text())
 
     def refresh():
@@ -95,6 +97,10 @@ def create_app(store=None, local_worker=True):
             "data_note": "Fictional demo company, suppliers, inventory and locations.",
         }
 
+    @app.get("/api/observability")
+    def observability():
+        return monitor.read()
+
     @app.get("/api/state")
     def current_state():
         return refresh()
@@ -102,7 +108,10 @@ def create_app(store=None, local_worker=True):
     @app.get("/api/runs/{run_id}")
     def detail(run_id: str):
         try:
-            return get_run(store, run_id)
+            record = get_run(store, run_id)
+            if record["status"] == "completed":
+                record["comparison"] = comparisons(store, runs(store)).get(run_id)
+            return record
         except FileNotFoundError as exc:
             raise HTTPException(404, "Processing run not found.") from exc
 

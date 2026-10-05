@@ -12,6 +12,8 @@ The business is fictional. All suppliers, products, quantities and warehouse loc
 2. Open **Receive files**, select a supplier and download its sample CSV.
 3. Upload it and follow the processing result. Re-uploading identical contents returns the same processing ID.
 4. For Centro / Nexo, upload the error example, inspect the rejected rows, then upload the correction. Invalid data cannot replace valid inventory.
+5. Open a completed run to compare it with the previous valid stock version from the same supplier and warehouse.
+6. Review warehouse-scoped charts on **Overview**, historical incidents on **Processing runs**, and aggregate processor logs on **How Azure works**.
 
 The public Azure demo accepts only the supplied fixtures. Run locally to experiment with your own CSV files. Files are complete snapshots for one supplier and warehouse, not deliveries to add repeatedly to existing stock.
 
@@ -70,6 +72,7 @@ bicep build infra/budget.bicep
 | `validation.py` | CSV formats, row checks and normalization to integer euro cents |
 | `store.py` | Atomic local files, private Azure blobs, locks and queue submission |
 | `service.py` | Content-based IDs, run lifecycle, snapshot selection and SQL aggregation |
+| `monitor.py` | Fixed Azure Monitor log query, aggregate-only response and five-minute cache |
 | `worker.py` | Receive a queue message, process it, acknowledge or retry it |
 | `api.py` | Portal endpoints, public fixture restriction and local processing loop |
 | `web/` | English interface, warehouse map and filters |

@@ -19,3 +19,9 @@ A newer complete snapshot removes products absent from the previous snapshot for
 DuckDB SQL groups normalized records by warehouse, SKU, product and category. Quantity is summed over independent suppliers. Value at cost is `SUM(quantity * unit_cost_cents)` in integer cents, not revenue or retail valuation. Distinct references counts distinct SKUs within the selected warehouses. Low stock counts product/warehouse combinations with quantity < 10; it is a fixed demo threshold, not a forecast or purchasing recommendation.
 
 The UI displays source dates and oldest/newest dates when records are combined. It does not invent a common observation time. Process duration excludes time waiting in the queue and container startup. No savings, SLA or production-scale performance claims are made.
+
+## Snapshot comparisons and charts
+
+Comparisons reconstruct adjacent completed versions for the same supplier and warehouse, ordered by stock date, receipt time and run ID, exactly like inventory selection. They are not a record of inventory at the time a request arrived. A late-arriving older file can become the comparison baseline but cannot replace a newer stock date. Rejected and failed files are excluded. The first valid version has no baseline or invented delta. Added and removed references are explicit; cost-only changes are included. Unit and value differences are not sales or shipments. All cost calculations remain integer cents.
+
+Overview charts aggregate the same warehouse-filtered inventory as the KPI cards: quantity by warehouse and value at cost by category. Inventory search and low-stock controls apply only to the inventory table and its CSV. Historical incidents follow the warehouse selection, independently of the processing-history status filter; corrected uploads preserve the original rejection in history.

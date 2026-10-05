@@ -6,6 +6,7 @@ const number = (value) => new Intl.NumberFormat('en-GB').format(value);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 const labels = {queued: 'Queued', processing: 'Processing', completed: 'Completed', rejected: 'Rejected', failed: 'Technical failure'};
 const titles = {overview: 'Warehouse operations', inventory: 'Inventory', upload: 'File intake', runs: 'Processing runs', cloud: 'The system in Azure'};
+let observation, observationBusy = false;
 let catalog, data, runtime, map, markers = [], selection = '', activeTab = 'overview', refreshBusy = false, map3D = false, mapVectorReady = false;
 
 async function json(url, options) {
@@ -45,6 +46,55 @@ function renderInventory() {
   $('#inventory-table').innerHTML = rows.length ? `<table><thead><tr><th>Product</th><th>Warehouse</th><th>Category</th><th>Units</th><th>Value at cost</th><th>Stock date</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escapeHtml(r.product)}<small>${escapeHtml(r.sku)}</small></td><td>${escapeHtml(warehouseName(r.warehouse))}</td><td>${escapeHtml(r.category)}</td><td class="${r.quantity < 10 ? 'low' : ''}">${number(r.quantity)}${r.quantity < 10 ? ' · review' : ''}</td><td>${money(r.value_cents)}</td><td>${escapeHtml(r.oldest_snapshot)}${r.oldest_snapshot !== r.newest_snapshot ? ' – ' + escapeHtml(r.newest_snapshot) : ''}</td></tr>`).join('')}</tbody></table>` : empty('No products match these filters.');
 }
 
+function chartGroups(rows, field, metric) {
+  const groups = new Map();
+  rows.forEach((row) => groups.set(row[field], (groups.get(row[field]) || 0) + row[metric]));
+  return [...groups].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+function bars(groups, format, name = (value) => value) {
+  if (!groups.length) return empty('No inventory in this selection.');
+  const max = Math.max(1, ...groups.map(([, value]) => value));
+  return `<ul class="bar-chart">${groups.map(([key, value]) => `<li><div><span>${escapeHtml(name(key))}</span><strong>${escapeHtml(format(value))}</strong></div><div class="bar-track" aria-hidden="true"><span style="width:${value / max * 100}%"></span></div></li>`).join('')}</ul>`;
+}
+function repairTip(message) {
+  if (/quantity|units/i.test(message)) return 'Use a whole number from 0 to 100,000.';
+  if (/reference|sku/i.test(message)) return 'Use a product reference from the sample catalog; remove duplicate references.';
+  if (/cost|price/i.test(message)) return 'Use a positive cost with at most two decimal places.';
+  if (/date|day|month/i.test(message)) return 'Use one valid YYYY-MM-DD stock date for all rows, between 2020 and today.';
+  if (/technical|attempt|storage/i.test(message)) return 'Ask the operator to inspect the worker logs before retrying.';
+  return 'Check the supplier sample format, encoding, headers and delimiters; correct and upload the file again.';
+}
+function renderIncidents(records) {
+  const issues = records.filter((r) => ['rejected', 'failed'].includes(r.status));
+  const errors = issues.reduce((n, r) => n + r.errors.length, 0);
+  $('#incident-summary').textContent = `${issues.length} affected files · ${errors} reported errors`;
+  $('#incidents').innerHTML = issues.length ? issues.map((r) => `<details class="incident"><summary>${escapeHtml(r.filename)} · ${escapeHtml(warehouseName(r.warehouse))} · ${escapeHtml(labels[r.status])} · ${r.errors.length} errors</summary><p>${escapeHtml(supplierName(r.supplier))} · ${dateTime(r.received_at)}</p><ul>${[...new Set(r.errors.map((e) => e.message))].map((message) => `<li><strong>${escapeHtml(message)}</strong><p>${escapeHtml(repairTip(message))}</p></li>`).join('')}</ul><button class="row-button" data-run="${r.id}">View affected rows →</button></details>`).join('') : empty('No rejected files or technical failures in this selection.');
+}
+function comparisonHtml(id, comparison = data.comparisons?.[id]) {
+  if (!comparison) return '';
+  const explanation = `<h3>Snapshot comparison</h3><p>${comparison.active ? 'Current valid snapshot' : 'Superseded snapshot'} for this supplier and warehouse.</p>`;
+  if (!comparison.baseline_id) return explanation + '<p>First valid business version: no earlier snapshot to compare.</p>';
+  const exactMoney = (value) => new Intl.NumberFormat('en-GB', {style:'currency', currency:'EUR'}).format(value / 100);
+  const signed = (value, format) => (value > 0 ? '+' : '') + format(value);
+  return explanation + `<p>Compared with <button class="row-button" data-run="${comparison.baseline_id}">previous valid snapshot (${escapeHtml(comparison.baseline_date)})</button>, ordered by stock date, then receipt time. This is a stock difference, not a shipment or sale.</p><p><strong>${signed(comparison.units_delta, number)} units · ${signed(comparison.value_delta_cents, exactMoney)} at cost</strong></p>` + (comparison.changes.length ? `<div class="table-wrap"><table><thead><tr><th>Product</th><th>Change</th><th>Units before → after</th><th>Unit cost before → after</th></tr></thead><tbody>${comparison.changes.map((c) => `<tr><td>${escapeHtml(c.product)}<small>${escapeHtml(c.sku)}</small></td><td>${escapeHtml(c.change)}</td><td>${number(c.before_quantity)} → ${number(c.after_quantity)}</td><td>${c.before_cost_cents === null ? '—' : exactMoney(c.before_cost_cents)} → ${c.after_cost_cents === null ? '—' : exactMoney(c.after_cost_cents)}</td></tr>`).join('')}</tbody></table></div>` : '<p>No quantity or unit-cost changes.</p>');
+}
+function renderObservability() {
+  const target = $('#observability');
+  if (!observation || observation.status !== 'ok') {
+    target.textContent = observation?.message || 'Azure Monitor is not connected in this runtime. Monitoring values are unavailable.';
+    return;
+  }
+  const m = observation.metrics;
+  target.innerHTML = `<p>${runtime === 'snapshot' ? 'Saved observation' : 'Last successful query'}: ${dateTime(observation.checked_at)} · refreshed at most every 5 minutes in Azure. Logs may arrive with a delay.</p><div class="monitor-grid">${[['Completed files', m.completed], ['Rejected files', m.rejected], ['Technical failure attempts', m.technical_failure_attempts], ['Mean processing duration', m.average_duration_ms === null ? '—' : number(Math.round(m.average_duration_ms * 100) / 100) + ' ms']].map(([label, value]) => `<div><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div><p class="muted">${m.last_event_at ? 'Last matching log: ' + dateTime(m.last_event_at) : 'No matching processor events in this 7-day window.'} · Counts come from Azure Monitor logs; retries and retention can differ from processing history. Duration measures worker processing, not queue wait.</p>`;
+}
+async function refreshObservability() {
+  if (runtime === 'snapshot' || observationBusy) return;
+  observationBusy = true;
+  try { observation = await json('./api/observability'); }
+  catch (_) { observation = {status:'unavailable', message:'Azure Monitor could not be reached. Monitoring values are unavailable.'}; }
+  finally { observationBusy = false; renderObservability(); }
+}
+
 function render() {
   const view = filteredState(data, selection);
   $('#units').textContent = number(view.units);
@@ -69,6 +119,9 @@ function render() {
     element.setAttribute('aria-pressed', String(selection === warehouse.id));
   });
   renderInventory();
+  $('#units-chart').innerHTML = bars(chartGroups(view.inventory, 'warehouse', 'quantity'), number, warehouseName);
+  $('#value-chart').innerHTML = bars(chartGroups(view.inventory, 'category', 'value_cents'), money);
+  renderIncidents(view.runs);
 }
 
 function chooseWarehouse(id) {
@@ -146,6 +199,7 @@ function showTab(id) {
   document.querySelectorAll('.view').forEach((section) => { section.hidden = section.id !== id; });
   document.querySelectorAll('[data-tab]').forEach((button) => { button.classList.toggle('active', button.dataset.tab === id); button.setAttribute('aria-current', button.dataset.tab === id ? 'page' : 'false'); });
   $('#page-title').textContent = titles[id];
+  if (id === 'cloud') refreshObservability();
   if (id === 'overview' && map) requestAnimationFrame(() => map.resize());
 }
 
@@ -166,6 +220,7 @@ async function refresh(silent = false) {
   try {
     if (runtime !== 'snapshot') data = await json('./api/state');
     render();
+    if (activeTab === 'cloud') refreshObservability();
     $('#error').hidden = true;
   } catch (error) {
     if (!silent) { $('#error').textContent = error.message; $('#error').hidden = false; }
@@ -194,6 +249,7 @@ async function detail(id) {
     const run = runtime === 'snapshot' ? data.runs.find((r) => r.id === id) : await json(`./api/runs/${id}`);
     if (!run) return;
     $('#detail-content').innerHTML = `<p class="eyebrow">PROCESSING DETAILS</p><h2>${escapeHtml(run.filename)}</h2>${badge(run.status)}<div class="detail-facts"><div><span>Warehouse</span><strong>${escapeHtml(warehouseName(run.warehouse))}</strong></div><div><span>Supplier</span><strong>${escapeHtml(supplierName(run.supplier))}</strong></div><div><span>Rows read</span><strong>${run.row_count}</strong></div><div><span>Processing attempts</span><strong>${run.attempts}</strong></div><div><span>Processing duration</span><strong>${run.duration_ms === null ? '—' : number(run.duration_ms) + ' ms'}</strong></div><div><span>Inventory date</span><strong>${escapeHtml(run.snapshot_date || '—')}</strong></div><div><span>Recorded runtime</span><strong>${escapeHtml(run.runtime)}</strong></div><div><span>Finished</span><strong>${dateTime(run.finished_at)}</strong></div></div><p class="muted">ID: ${escapeHtml(run.id)}</p>${run.errors.length ? `<ul class="error-list">${run.errors.slice(0, 100).map((e) => `<li><b>${e.line ? 'Line ' + e.line : 'File'}:</b> ${escapeHtml(e.message)}</li>`).join('')}</ul><p class="muted">${run.errors.length} errors. Correct the file and submit it again.</p>` : `<p>${run.status === 'completed' ? 'All rows are valid. This snapshot contributes to inventory if it is the latest version for the supplier and warehouse.' : 'The file has not yet published a valid result.'}</p>`}`;
+    $('#detail-content').insertAdjacentHTML('beforeend', comparisonHtml(id, run.comparison));
     if (!$('#detail').open) $('#detail').showModal();
   } catch (error) { $('#error').textContent = error.message; $('#error').hidden = false; }
 }
@@ -215,7 +271,7 @@ async function init() {
     const mode = await json('./assets/mode.json');
     if (mode.mode === 'snapshot') {
       const snapshot = await json('./assets/demo.json');
-      catalog = snapshot.catalog; data = snapshot.state; runtime = 'snapshot';
+      catalog = snapshot.catalog; data = snapshot.state; observation = snapshot.observability; runtime = 'snapshot';
     } else {
       [catalog, data] = await Promise.all([json('./api/catalog'), json('./api/state')]);
       runtime = catalog.runtime;
@@ -242,6 +298,7 @@ async function init() {
     updateSamples();
     try { initializeMap(); } catch (error) { $('#map-fallback').hidden = false; $('#map-3d').disabled = true; $('#basemap-status').textContent = 'Basemap unavailable'; }
     render();
+    renderObservability();
     document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
     document.querySelectorAll('[data-warehouse]').forEach((b) => b.addEventListener('click', () => chooseWarehouse(selection === b.dataset.warehouse ? '' : b.dataset.warehouse)));
     $('#warehouse').addEventListener('change', (e) => chooseWarehouse(e.target.value));

@@ -39,3 +39,11 @@ Redeploy the previous verified image digest using the same Bicep. Input files an
 ## Shutdown
 
 Review actual resource costs in the portal. To stop processing, remove the event trigger or stop/delete the project job after confirming pending messages. Delete the dedicated portfolio resource group only when the owner wants to retire the deployment and after exporting evidence; this deletes storage, logs and the registry. GitHub Pages remains independent. Nothing here enables an unattended cleanup schedule.
+
+## Azure Monitor summary
+
+The portal's `/api/observability` endpoint runs one fixed query over the existing `ContainerAppConsoleLogs_CL` table. It returns only aggregate completed/rejected file counts, technical failure attempts, mean worker duration and the latest matching timestamp over seven days. The query is defined in `src/operations_cloud/monitor.py`. It includes existing `file_processed` log events and the worker's existing technical-failure message; no historical log migration is required. Completed events are deduplicated by run ID. Technical failures count attempts and may include files that later succeeded. Queue waiting time is not measured.
+
+Set `OPERATIONS_LOG_WORKSPACE_ID` to the existing workspace customer ID. The portal's managed identity needs **Log Analytics Reader** scoped only to `operations-logs`; this assignment is included in Bicep. Authentication uses managed identity, with no storage keys or workspace tokens exposed in the browser. The public endpoint accepts no custom queries and exposes no raw logs. Results, including temporary failures, are cached for five minutes to bound requests. Logs may arrive late; absent access or partial responses show unavailable, never false zero metrics.
+
+Monitoring is global across warehouses because historical worker events lack warehouse fields. New events also include warehouse and supplier for operator investigation. The static export preserves the last successful observation and its query timestamp; it never claims live monitoring. Local mode leaves Azure Monitor disconnected. No additional Azure service is provisioned, although log querying remains subject to the existing workspace's pricing and limits. See Microsoft's [Logs API authentication documentation](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api).

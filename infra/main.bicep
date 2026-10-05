@@ -114,6 +114,15 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     workspaceCapping: { dailyQuotaGb: json('0.1') }
   }
 }
+resource monitorReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(logs.id, identities[0].id, 'log-reader')
+  scope: logs
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '73c42c96-874c-492b-b04d-ab87d138a893')
+    principalId: identities[0].properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
 resource environment 'Microsoft.App/managedEnvironments@2026-07-01' = {
   name: '${prefix}-standard-environment'
   location: location
@@ -147,6 +156,7 @@ resource portal 'Microsoft.App/containerApps@2025-01-01' = {
         resources: { cpu: json('0.25'), memory: '0.5Gi' }
         env: [
           { name: 'OPERATIONS_STORAGE_ACCOUNT', value: storage.name }
+          { name: 'OPERATIONS_LOG_WORKSPACE_ID', value: logs.properties.customerId }
           { name: 'AZURE_CLIENT_ID', value: identities[0].properties.clientId }
         ]
         probes: [

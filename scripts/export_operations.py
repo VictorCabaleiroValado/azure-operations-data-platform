@@ -24,6 +24,7 @@ if args.cloud_url:
 
     catalog = fetch("/api/catalog")
     snapshot = fetch("/api/state")
+    observability = fetch("/api/observability")
     if catalog["runtime"] != "azure" or any(r["runtime"] != "azure" for r in snapshot["runs"]):
         raise ValueError("Cloud export requires records actually processed in Azure")
 else:
@@ -31,6 +32,7 @@ else:
     app = create_app(store, local_worker=False)
     catalog = next(r for r in app.routes if r.path == "/api/catalog").endpoint()
     snapshot = state(store)
+    observability = {"status": "not_configured", "source": "Azure Monitor", "window_days": 7}
 output = ROOT / "dist"
 output.mkdir(exist_ok=True)
 shutil.copy(ROOT / "web/index.html", output / "index.html")
@@ -46,7 +48,7 @@ if config_path.exists() and not args.cloud_url:
     mode["cloud_url"] = json.loads(config_path.read_text())["app_url"]
 (output / "assets/mode.json").write_text(json.dumps(mode))
 (output / "assets/demo.json").write_text(
-    json.dumps({"catalog": catalog, "state": snapshot}, ensure_ascii=False)
+    json.dumps({"catalog": catalog, "state": snapshot, "observability": observability}, ensure_ascii=False)
 )
 (output / ".nojekyll").touch()
 print("Exported operations snapshot; uploads are explicitly disabled on static hosting.")
