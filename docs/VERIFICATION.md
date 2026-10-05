@@ -49,3 +49,17 @@ Verification performed for this edition:
 - `git fetch origin` succeeded. The local baseline and `origin/main` both point to `e15048c`; translation changes remain uncommitted local work.
 
 These checks establish local readiness only. This English edition has not been pushed to GitHub, published to GitHub Pages or deployed to Azure. Next publication steps are to commit/push the reviewed changes, publish `dist/`, build an immutable Azure image, update the portal and worker to that image, and verify the live English interface and existing processing behavior. Victor authorized publication to GitHub Pages and Azure on 5 October 2026; deployment verification follows below once completed.
+
+### Published English release
+
+Victor authorized publication and explicitly authorized reading the synthetic live inventory for verification.
+
+- Application commit: `da453abf04753afae6e268b8664afe8c83de864c`.
+- [Validate](https://github.com/VictorCabaleiroValado/azure-operations-data-platform/actions/runs/37346677159), [Build Azure image](https://github.com/VictorCabaleiroValado/azure-operations-data-platform/actions/runs/37346746825) and [Publish free demo](https://github.com/VictorCabaleiroValado/azure-operations-data-platform/actions/runs/37346752251) all completed successfully for that commit.
+- Portal and processing job both use `telecomvc53728.azurecr.io/operations@sha256:51b822dea5ddb0567e0f7b807e8f031333032180108cd9a24185d0bb2c99090f`.
+- Azure revision `operations-web--0000005` is Healthy and Provisioned; it is the only active revision and receives 100% of traffic. The processing job update succeeded. `/health/ready` confirms Azure storage is ready.
+- Published HTML and JavaScript bytes match the approved English sources in both Azure and Pages. The live Azure catalog, inventory labels and historical rejected-run details return English.
+- Live numeric inventory and run-ID hashes match the preserved static cloud snapshot: 14 runs, 48 inventory rows, 2,417 units and EUR 358,052 at supplier cost. No complete live inventory payload was persisted during verification.
+- A read-only headless Edge walkthrough of both published applications verified five tabs, English labels, Pedrezuela's 549 units, English product search, historical errors, appropriate upload availability and no horizontal overflow at 390 px. No JavaScript page errors were observed.
+
+No new live uploads or worker executions were triggered for this language release. The duplicate/rejection/correction behavior passed local and GitHub CI tests; the earlier cloud execution evidence remains historical. External map tile rendering and 3D readiness were not reverified in this release. No personal payments or account-plan changes were made.
